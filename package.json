@@ -1,0 +1,20 @@
+{
+  "name": "avelu",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PWA Avelu com API Node.js e MySQL",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "db:setup": "node scripts/setup-database.js",
+    "db:migrate:pt": "node scripts/migrate-to-portuguese.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "mysql2": "^3.14.0"
+  }
+}

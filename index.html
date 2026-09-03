@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Encontre profissionais e serviços de saúde perto de você.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Avelu — Cuidado que te encontra</title>
+<meta name="theme-color" content="#0ea56b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --green:#0ea56b;
+  --green-dark:#064f3c;
+  --mint:#eaf8f2;
+  --text:#07382f;
+  --line:#edf2ef;
+  --shadow:0 10px 30px rgba(13,80,60,.08);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+html,body{margin:0;padding:0;width:100%;min-width:320px;overflow-x:hidden}
+body{
+  font-family:Inter,Arial,sans-serif;
+  color:var(--text);
+  background:#fff;
+}
+img{display:block;max-width:100%}
+a{text-decoration:none;color:inherit}
+button,input{font:inherit}
+button,a{-webkit-tap-highlight-color:transparent}
+.skip{position:absolute;left:-9999px}.skip:focus{left:12px;top:12px;z-index:99;background:#fff;padding:10px;border-radius:8px}
+
+/* FULL BLEED: sem container central limitado */
+.full{width:100vw;margin:0;padding:0}
+.pad{width:100%;padding-left:24px;padding-right:24px}
+
+/* HEADER */
+header{
+  width:100vw;
+  min-height:82px;
+  border-bottom:1px solid var(--line);
+  background:#fff;
+  display:flex;
+  align-items:center;
+  position:sticky;top:0;z-index:20;
+}
+.nav{
+  width:100%;
+  padding:0 24px;
+  display:grid;
+  grid-template-columns:180px 1fr 200px;
+  gap:20px;
+  align-items:center;
+}
+.logo{width:150px}
+.navlinks{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:38px;
+  font-size:14px;
+  white-space:nowrap;
+}
+.actions{display:flex;justify-content:flex-end;align-items:center;gap:18px;font-size:14px;font-weight:600}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  border-radius:11px;padding:13px 22px;border:1px solid transparent;
+  font-weight:600;cursor:pointer;
+}
+.btn-primary{background:linear-gradient(135deg,#12995f,#04bd7c);color:#fff}
+.menu{display:none;border:0;background:transparent;font-size:28px;color:var(--green-dark)}
+.mobile-nav{display:none;padding:8px 24px 20px;border-top:1px solid var(--line)}
+.mobile-nav.open{display:grid}.mobile-nav a{padding:12px 0;border-bottom:1px solid var(--line)}
+
+/* HERO - começa quase na borda e a imagem encosta à direita */
+.hero{
+  width:100vw;
+  background:linear-gradient(90deg,#fff 0 52%,#fbfcfb 52% 100%);
+}
+.hero-grid{
+  width:100vw;
+  min-height:560px;
+  display:grid;
+  grid-template-columns:52% 48%;
+  gap:0;
+}
+.hero-copy{
+  padding:82px 54px 48px 24px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  min-width:0;
+}
+.hero-copy h1{
+  margin:0 0 24px;
+  font-size:clamp(54px,4.9vw,82px);
+  line-height:.98;
+  letter-spacing:-3px;
+  font-weight:800;
+}
+.hero-copy h1 span{color:var(--green)}
+.hero-copy p{
+  margin:0 0 28px;
+  font-size:clamp(18px,1.35vw,21px);
+  line-height:1.55;
+  max-width:690px;
+}
+.search{
+  display:flex;
+  width:min(100%,700px);
+  min-height:62px;
+  padding:6px;
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:14px;
+  box-shadow:var(--shadow);
+}
+.search input{flex:1;min-width:0;border:0;outline:0;padding:0 18px}
+.search button{padding:0 34px}
+.cats{
+  width:min(100%,720px);
+  margin-top:28px;
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:12px;
+}
+.cat{text-align:center;font-size:13px}
+.cat b{display:block;font-size:26px;color:var(--green);margin-bottom:8px}
+
+.hero-img{
+  width:100%;
+  height:560px;
+  overflow:hidden;
+}
+.hero-img img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center top;
+}
+
+/* FEATURES */
+.features{
+  width:100vw;
+  padding:42px 24px 0;
+}
+.features h2{
+  text-align:center;
+  margin:0 0 34px;
+  font-size:clamp(26px,2vw,34px);
+}
+.feature-grid{
+  width:100%;
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:20px;
+}
+.feature{
+  min-height:235px;
+  padding:30px 24px;
+  text-align:center;
+  border:1px solid var(--line);
+  border-radius:18px;
+  box-shadow:var(--shadow);
+  background:#fff;
+}
+.ficon{
+  width:74px;height:74px;border-radius:50%;margin:0 auto 18px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--mint);color:var(--green);font-size:34px;font-weight:700
+}
+.feature h3{margin:0 0 10px;font-size:20px}
+.feature p{margin:0;font-size:14px;line-height:1.65;color:#35564e}
+
+/* MARKET */
+.market{
+  width:100vw;
+  padding:48px 24px 0;
+  display:grid;
+  grid-template-columns:1.1fr .9fr;
+  gap:28px;
+}
+.panel-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.panel-title h3{margin:0;font-size:20px}
+.panel-title a{color:var(--green);font-size:13px;font-weight:600}
+.doctors{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.doc{
+  position:relative;padding:16px;border:1px solid var(--line);border-radius:16px;
+  box-shadow:var(--shadow);background:#fff
+}
+.doc img{width:70px;height:70px;border-radius:50%;object-fit:cover;margin:0 auto 12px}
+.doc h4{font-size:14px;margin:0 0 4px}.doc small{font-size:11px;color:#6b7773}
+.doc .r,.doc .d,.doc .s{font-size:11px;margin-top:7px}
+.doc .r{color:#e8a416}.doc .d{color:#64716d}.doc .s{color:var(--green);font-weight:600}
+.services{display:flex;flex-direction:column;gap:12px}
+.service{
+  display:grid;grid-template-columns:54px 1fr 20px;gap:12px;align-items:center;
+  padding:12px 14px;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)
+}
+.service-icon{width:48px;height:48px;border-radius:11px;background:var(--mint);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:24px}
+.service strong,.service small,.service em{display:block}.service strong{font-size:13px}.service small{font-size:11px;color:#687570}.service em{font-size:11px;color:var(--green);font-style:normal}
+
+/* TRUST */
+.trust{width:100vw;padding:38px 24px}
+.trust h3{text-align:center;margin:0 0 28px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.metric{display:flex;justify-content:center;align-items:center;gap:12px}
+.micon{width:50px;height:50px;border-radius:50%;background:var(--mint);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:24px}
+.metric strong,.metric small{display:block}.metric strong{font-size:20px}.metric small{font-size:11px;color:#5d6d67}
+
+/* CTA */
+.cta-wrap{width:100vw;padding:0 24px 20px}
+.cta{
+  width:100%;
+  min-height:160px;
+  padding:30px 42px;
+  border-radius:22px;
+  background:linear-gradient(110deg,#07583f,#08714f);
+  color:#fff;
+  display:flex;align-items:center;justify-content:space-between;gap:30px;
+}
+.cta h2{margin:0 0 8px;font-size:28px}.cta p{margin:0;font-size:13px;color:#e5f3ed}
+.cta-actions{display:flex;gap:18px}.light{background:#fff;color:#084e3b}.outline{border-color:#8eb9aa;color:#fff}
+
+/* FOOTER */
+footer{width:100vw;padding:18px 24px 28px}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+.footer-grid{display:grid;grid-template-columns:1.2fr 1fr auto;align-items:center;gap:24px}
+.footer-brand{display:flex;align-items:center;gap:18px}.footer-brand img{width:120px}.footer-brand small{font-size:10px;color:#68746f}
+.footer-links{display:flex;justify-content:center;gap:26px;font-size:11px}.social{display:flex;gap:14px;font-weight:700}
+
+/* LAPTOP/TABLET */
+@media(max-width:1100px){
+  .nav{grid-template-columns:auto 1fr auto}
+  .navlinks{display:none}
+  .menu{display:block}
+  .hero-grid{grid-template-columns:1fr}
+  .hero-copy{padding:58px 24px 24px}
+  .hero-img{height:450px;margin:0 24px;width:calc(100% - 48px);border-radius:28px}
+  .feature-grid{grid-template-columns:repeat(2,1fr)}
+  .market{grid-template-columns:1fr}
+  .metrics{grid-template-columns:repeat(2,1fr)}
+  .cta{flex-direction:column;align-items:flex-start}
+  .footer-grid{grid-template-columns:1fr;text-align:center;justify-items:center}
+  .footer-brand{justify-content:center}
+}
+@media(max-width:720px){
+  .actions{display:none}
+  .hero-copy h1{font-size:48px}
+  .search{display:grid;grid-template-columns:1fr}
+  .search input{height:48px}.search button{height:46px}
+  .cats{display:flex;overflow-x:auto}.cat{flex:0 0 82px}
+  .feature-grid{grid-template-columns:1fr}
+  .doctors{grid-template-columns:repeat(3,210px);overflow-x:auto}
+  .metrics{grid-template-columns:1fr}
+  .cta-actions{flex-direction:column;width:100%}.cta-actions .btn{width:100%}
+  .footer-links{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#conteudo">Pular para o conteúdo</a>
+
+<header>
+  <div class="nav">
+    <img class="logo" src="assets/logo.png" alt="Avelu">
+    <nav class="navlinks">
+      <a href="#como">Como funciona</a>
+      <a href="#para-voce">Para você</a>
+      <a href="#profissionais">Para profissionais</a>
+      <a href="#">Planos</a>
+      <a href="#">Sobre nós</a>
+    </nav>
+    <div class="actions"><a href="#">Entrar</a><a class="btn btn-primary" href="#">Cadastrar</a></div>
+    <button class="menu" type="button" aria-label="Abrir menu" aria-controls="mobile-nav" aria-expanded="false">☰</button>
+  </div>
+  <nav class="mobile-nav" id="mobile-nav" aria-label="Navegação móvel"><a href="#como">Como funciona</a><a href="#para-voce">Para você</a><a href="#profissionais">Para profissionais</a><a href="#">Planos</a><a href="#">Sobre nós</a><a href="#">Entrar</a><a href="#">Cadastrar</a></nav>
+</header>
+
+<main id="conteudo">
+<section class="hero" id="para-voce">
+  <div class="hero-grid">
+    <div class="hero-copy">
+      <h1>Cuidado que<br><span>te encontra.</span></h1>
+      <p>Descreva o que você precisa e encontre os melhores profissionais de saúde perto de você.<br><strong>Rápido, fácil e confiável.</strong></p>
+      <form class="search" role="search">
+        <label class="skip" for="busca">O que você procura?</label>
+        <input id="busca" name="q" type="search" placeholder="Ex.: dor de cabeça, consulta com clínico, psicólogo...">
+        <button class="btn btn-primary" type="submit">Buscar</button>
+      </form>
+      <div class="cats">
+        <div class="cat"><b>🩺</b>Consultas</div>
+        <div class="cat"><b>▣</b>Exames</div>
+        <div class="cat"><b>♧</b>Terapias</div>
+        <div class="cat"><b>🦷</b>Dentistas</div>
+        <div class="cat"><b>•••</b>E muito mais</div>
+      </div>
+    </div>
+    <div class="hero-img"><img src="assets/hero-woman.png" alt="Mulher sorrindo durante atendimento de saúde" fetchpriority="high"></div>
+  </div>
+</section>
+
+<section class="features" id="como">
+  <h2>Tudo o que você precisa para cuidar da sua saúde</h2>
+  <div class="feature-grid">
+    <article class="feature"><div class="ficon">⌕</div><h3>Encontre</h3><p>Busque por especialidade, sintomas ou profissionais perto de você.</p></article>
+    <article class="feature"><div class="ficon">▣</div><h3>Agende</h3><p>Escolha o melhor horário e agende sua consulta em poucos cliques.</p></article>
+    <article class="feature"><div class="ficon">•••</div><h3>Converse</h3><p>Tire dúvidas e receba orientações antes da sua consulta.</p></article>
+    <article class="feature"><div class="ficon">♥</div><h3>Cuide-se</h3><p>Acompanhe seu histórico, receba lembretes e cuide da sua saúde sempre.</p></article>
+  </div>
+</section>
+
+<section class="market">
+  <div>
+    <div class="panel-title"><h3>ϟ Atendimento disponível hoje</h3><a href="#">Ver todos</a></div>
+    <div class="doctors" id="professionals-list" aria-live="polite">
+      <article class="doc"><img src="assets/avatar-gustavo.png"><h4>Dr. Gustavo Alves</h4><small>Clínico Geral</small><div class="r">★ 4,9 (128 avaliações)</div><div class="d">⌖ 1,2 km de você</div><div class="s">◷ Hoje · 14:00</div></article>
+      <article class="doc"><img src="assets/avatar-mariana.png"><h4>Dra. Mariana Lima</h4><small>Gastroenterologista</small><div class="r">★ 4,8 (96 avaliações)</div><div class="d">⌖ 1,8 km de você</div><div class="s">◷ Hoje · 15:30</div></article>
+      <article class="doc"><img src="assets/avatar-pedro.png"><h4>Dr. Pedro Mendes</h4><small>Dentista</small><div class="r">★ 4,9 (81 avaliações)</div><div class="d">⌖ 900 m de você</div><div class="s">◷ Hoje · 16:00</div></article>
+    </div>
+  </div>
+  <div>
+    <div class="panel-title"><h3>● Serviços próximos a você</h3><a href="#">Ver todos</a></div>
+    <div class="services">
+      <div class="service"><div class="service-icon">⚗</div><div><strong>Laboratório Biovale</strong><small>Exames laboratoriais</small><em>850 m · Aberto até 17:00</em></div><div>›</div></div>
+      <div class="service"><div class="service-icon">▦</div><div><strong>Clínica Vida</strong><small>Diversas especialidades</small><em>1,3 km · Aberto até 18:00</em></div><div>›</div></div>
+      <div class="service"><div class="service-icon">♥</div><div><strong>FisioMais</strong><small>Fisioterapia e reabilitação</small><em>1,1 km · Aberto até 19:00</em></div><div>›</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="trust">
+  <h3>Milhares de pessoas já confiam na Avelu</h3>
+  <div class="metrics">
+    <div class="metric"><div class="micon">♟</div><div><strong>+ 50 mil</strong><small>pacientes atendidos</small></div></div>
+    <div class="metric"><div class="micon">✓</div><div><strong>+ 15 mil</strong><small>agendamentos realizados</small></div></div>
+    <div class="metric"><div class="micon">☆</div><div><strong>4,8 ★</strong><small>avaliação média</small></div></div>
+    <div class="metric"><div class="micon">♢</div><div><strong>100%</strong><small>segurança e privacidade</small></div></div>
+  </div>
+</section>
+
+<div class="cta-wrap">
+  <section class="cta">
+    <div><h2>Pronto para cuidar da sua saúde?</h2><p>Cadastre-se gratuitamente e tenha uma experiência completa na Avelu.</p></div>
+    <div class="cta-actions"><a class="btn light" href="#">Cadastrar gratuitamente</a><a class="btn outline" href="#">Sou profissional de saúde</a></div>
+  </section>
+</div>
+</main>
+
+<footer>
+  <div class="footer-grid">
+    <div class="footer-brand"><img src="assets/logo.png"><small>© 2026 Avelu. Todos os direitos reservados.</small></div>
+    <div class="footer-links"><a href="#">Privacidade</a><a href="#">Termos de uso</a><a href="#">Ajuda</a><a href="#">Contato</a></div>
+    <div class="social"><span>◎</span><span>f</span><span>in</span><span>▶</span></div>
+  </div>
+</footer>
+<script src="app.js" defer></script>
+</body>
+</html>
