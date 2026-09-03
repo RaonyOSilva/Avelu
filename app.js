@@ -51,5 +51,5 @@ searchForm?.addEventListener('submit',event=>{
   loadProfessionals(new FormData(searchForm).get('q')?.trim()||'');
 });
 
-loadProfessionals();
+if(professionalsList)loadProfessionals();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js'));}

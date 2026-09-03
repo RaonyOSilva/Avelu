@@ -1,5 +1,5 @@
-const CACHE='avelu-v2';
-const FILES=['./','./index.html','./app.js','./manifest.webmanifest','./assets/icon.svg','./assets/logo.png','./assets/hero-woman.png','./assets/avatar-gustavo.png','./assets/avatar-mariana.png','./assets/avatar-pedro.png'];
+const CACHE='avelu-v3';
+const FILES=['./','./index.html','./sobre.html','./paginas.css','./app.js','./manifest.webmanifest','./assets/icon.svg','./assets/logo.png','./assets/hero-woman.png','./assets/avatar-gustavo.png','./assets/avatar-mariana.png','./assets/avatar-pedro.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)));self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))));self.clients.claim();});
 self.addEventListener('fetch',event=>{
