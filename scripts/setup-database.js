@@ -19,6 +19,11 @@ async function main() {
     const seed = await fs.readFile(path.join(__dirname, '../database/dados-iniciais.sql'), 'utf8');
     await connection.query(schema);
     await connection.query(seed);
+    await connection.query(await fs.readFile(path.join(__dirname, '../database/sessoes.sql'), 'utf8'));
+    await connection.query(await fs.readFile(path.join(__dirname, '../database/locais.sql'), 'utf8'));
+    await require('./setup-specialties').setupSpecialties(connection);
+    await require('./setup-profiles').setupProfiles(connection);
+    await require('./setup-journey').setupJourney(connection);
     console.log('Banco Avelu criado e dados iniciais inseridos.');
   } finally {
     await connection.end();

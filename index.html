@@ -198,15 +198,19 @@ header{
 }
 .doc img{width:70px;height:70px;border-radius:50%;object-fit:cover;margin:0 auto 12px}
 .doc h4{font-size:14px;margin:0 0 4px}.doc small{font-size:11px;color:#6b7773}
+.professional-services{font-size:11px;color:#536b64;line-height:1.6;max-height:90px;overflow:auto}.professional-services:empty{display:none}
 .doc .r,.doc .d,.doc .s{font-size:11px;margin-top:7px}
-.doc .r{color:#e8a416}.doc .d{color:#64716d}.doc .s{color:var(--green);font-weight:600}
+.booking-link{display:inline-block;margin-top:14px;padding:8px 15px;border-radius:8px;background:#eaf8f2;color:#064f3c;font-size:12px;font-weight:700}.booking-link:focus-visible{outline:3px solid #0ea56b;outline-offset:3px}.doc .r{color:#e8a416}.doc .d{color:#64716d}.doc .s{color:var(--green);font-weight:600}
 .services{display:flex;flex-direction:column;gap:12px}
+.place-filters{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}.place-filters button{font:inherit;font-size:12px;padding:9px 13px;border:1px solid #dcebe5;border-radius:20px;background:#fff;color:#064f3c;cursor:pointer}.place-filters button[aria-pressed=true]{background:#064f3c;border-color:#064f3c;color:#fff}.place-filters button:focus-visible,.place-search input:focus-visible{outline:3px solid #0ea56b;outline-offset:3px}.place-search{display:flex;gap:8px}.place-search input{flex:1;min-width:0;border:1px solid #dcebe5;border-radius:10px;padding:12px;font:inherit;font-size:13px}.place-search button{font-size:12px;white-space:nowrap}.place-results-status{font-size:12px;color:#536b64;margin:12px 0}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}@media(max-width:480px){.place-search{flex-direction:column}}
+#places-list{max-height:650px;overflow-y:auto}.place-contact{display:block;font-size:12px;color:var(--green);margin-top:8px;text-decoration:underline}#places-list .service{grid-template-columns:48px minmax(0,1fr);align-items:start}#places-list .service>div{min-width:0;overflow-wrap:anywhere}
 .service{
   display:grid;grid-template-columns:54px 1fr 20px;gap:12px;align-items:center;
   padding:12px 14px;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)
 }
 .service-icon{width:48px;height:48px;border-radius:11px;background:var(--mint);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:24px}
 .service strong,.service small,.service em{display:block}.service strong{font-size:13px}.service small{font-size:11px;color:#687570}.service em{font-size:11px;color:var(--green);font-style:normal}
+#places-list .place-address{margin-top:6px;line-height:1.5}#places-list .place-specialties{margin-top:8px;line-height:1.5}
 
 /* TRUST */
 .trust{width:100vw;padding:38px 24px}
@@ -264,6 +268,11 @@ footer{width:100vw;padding:18px 24px 28px}
   .cta-actions{flex-direction:column;width:100%}.cta-actions .btn{width:100%}
   .footer-links{flex-wrap:wrap}
 }
+/* Conteúdo legível em telas grandes e navegação acessível. */
+.full,header,.hero,.hero-grid,.features,.cta-wrap,footer{width:100%}
+.nav,.hero-grid,.features,.cta-wrap,.footer-grid{max-width:1440px;margin-inline:auto}
+.feature-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.features{padding-block:64px}.feature{box-shadow:none;min-height:210px}.ficon{width:48px;height:48px;font-size:20px}.hero-copy{padding:64px 32px 48px 24px}.hero-copy h1{font-size:clamp(44px,5vw,68px);line-height:1.06;letter-spacing:-2px}.hero-copy .explore-note{font-size:13px;line-height:1.6;margin:16px 0 0;color:#526a62}.footer-grid{grid-template-columns:1fr auto}.search:focus-within{outline:3px solid #08714f;outline-offset:3px}a:focus-visible,button:focus-visible{outline:3px solid #08714f;outline-offset:4px}.btn-primary{background:#087653}.navlinks a,.actions a{min-height:44px;display:inline-flex;align-items:center}header{flex-wrap:wrap}.mobile-nav{width:100%}#como{scroll-margin-top:100px}
+@media(max-width:700px){.feature-grid{grid-template-columns:1fr}.features{padding-block:36px}.feature{min-height:0;text-align:left;padding:24px}.ficon{margin:0 0 16px}.footer-grid{grid-template-columns:1fr}.footer-links{justify-content:flex-start;flex-wrap:wrap}.hero-img{height:300px}.hero-copy{padding:40px 20px 28px}.nav{padding:0 20px}.actions a[href="cadastro.html"]{display:none}.cta{padding:28px}.cta h2{font-size:24px}}
 </style>
 </head>
 <body>
@@ -272,17 +281,11 @@ footer{width:100vw;padding:18px 24px 28px}
 <header>
   <div class="nav">
     <img class="logo" src="assets/logo.png" alt="Avelu">
-    <nav class="navlinks">
-      <a href="#como">Como funciona</a>
-      <a href="#para-voce">Para você</a>
-      <a href="#profissionais">Para profissionais</a>
-      <a href="#">Planos</a>
-      <a href="sobre.html">Sobre nós</a>
-    </nav>
-    <div class="actions"><a href="#">Entrar</a><a class="btn btn-primary" href="#">Cadastrar</a></div>
+    <nav class="navlinks" aria-label="Navegação principal"><a href="index.html" aria-current="page">Início</a><a href="buscar.html">Agendar</a><a href="#como">Como funciona</a></nav>
+    <div class="actions"><a href="entrar.html">Entrar</a><a class="btn btn-primary" href="cadastro.html">Cadastrar</a></div>
     <button class="menu" type="button" aria-label="Abrir menu" aria-controls="mobile-nav" aria-expanded="false">☰</button>
   </div>
-  <nav class="mobile-nav" id="mobile-nav" aria-label="Navegação móvel"><a href="#como">Como funciona</a><a href="#para-voce">Para você</a><a href="#profissionais">Para profissionais</a><a href="#">Planos</a><a href="sobre.html">Sobre nós</a><a href="#">Entrar</a><a href="#">Cadastrar</a></nav>
+  <nav class="mobile-nav" id="mobile-nav" aria-label="Navegação móvel"><a href="index.html">Início</a><a href="buscar.html">Agendar</a><a href="#como">Como funciona</a><a href="entrar.html">Entrar</a></nav>
 </header>
 
 <main id="conteudo">
@@ -290,76 +293,32 @@ footer{width:100vw;padding:18px 24px 28px}
   <div class="hero-grid">
     <div class="hero-copy">
       <h1>Cuidado que<br><span>te encontra.</span></h1>
-      <p>Descreva o que você precisa e encontre os melhores profissionais de saúde perto de você.<br><strong>Rápido, fácil e confiável.</strong></p>
-      <form class="search" role="search">
+      <p>Encontre locais e profissionais de saúde na sua cidade. Conheça os perfis e escolha onde se cuidar.</p>
+      <form class="search" role="search" action="buscar.html" method="get">
         <label class="skip" for="busca">O que você procura?</label>
-        <input id="busca" name="q" type="search" placeholder="Ex.: dor de cabeça, consulta com clínico, psicólogo...">
+        <input id="busca" name="q" type="search" placeholder="Busque por especialidade, local ou profissional">
         <button class="btn btn-primary" type="submit">Buscar</button>
       </form>
-      <div class="cats">
-        <div class="cat"><b>🩺</b>Consultas</div>
-        <div class="cat"><b>▣</b>Exames</div>
-        <div class="cat"><b>♧</b>Terapias</div>
-        <div class="cat"><b>🦷</b>Dentistas</div>
-        <div class="cat"><b>•••</b>E muito mais</div>
-      </div>
-    </div>
-    <div class="hero-img"><img src="assets/hero-woman.png" alt="Mulher sorrindo durante atendimento de saúde" fetchpriority="high"></div>
+      <p class="explore-note">Explore sem cadastro. Entre apenas para confirmar seu horário.</p></div><div class="hero-img"><img src="assets/hero-woman.png" alt="Mulher sorrindo durante atendimento de saúde" fetchpriority="high"></div>
   </div>
 </section>
 
-<section class="features" id="como">
-  <h2>Tudo o que você precisa para cuidar da sua saúde</h2>
-  <div class="feature-grid">
-    <article class="feature"><div class="ficon">⌕</div><h3>Encontre</h3><p>Busque por especialidade, sintomas ou profissionais perto de você.</p></article>
-    <article class="feature"><div class="ficon">▣</div><h3>Agende</h3><p>Escolha o melhor horário e agende sua consulta em poucos cliques.</p></article>
-    <article class="feature"><div class="ficon">•••</div><h3>Converse</h3><p>Tire dúvidas e receba orientações antes da sua consulta.</p></article>
-    <article class="feature"><div class="ficon">♥</div><h3>Cuide-se</h3><p>Acompanhe seu histórico, receba lembretes e cuide da sua saúde sempre.</p></article>
-  </div>
-</section>
+<section class="features" id="como"><h2>Seu próximo cuidado, em três passos</h2><div class="feature-grid"><article class="feature"><div class="ficon" aria-hidden="true">1</div><h3>Encontre</h3><p>Selecione sua cidade e busque um local ou profissional por especialidade.</p></article><article class="feature"><div class="ficon" aria-hidden="true">2</div><h3>Conheça</h3><p>Confira o perfil, as especialidades e os contatos antes de escolher.</p></article><article class="feature"><div class="ficon" aria-hidden="true">3</div><h3>Agende</h3><p>Escolha um horário disponível, confira o endereço e entre para confirmar.</p></article></div></section>
 
-<section class="market">
-  <div>
-    <div class="panel-title"><h3>ϟ Atendimento disponível hoje</h3><a href="#">Ver todos</a></div>
-    <div class="doctors" id="professionals-list" aria-live="polite">
-      <article class="doc"><img src="assets/avatar-gustavo.png"><h4>Dr. Gustavo Alves</h4><small>Clínico Geral</small><div class="r">★ 4,9 (128 avaliações)</div><div class="d">⌖ 1,2 km de você</div><div class="s">◷ Hoje · 14:00</div></article>
-      <article class="doc"><img src="assets/avatar-mariana.png"><h4>Dra. Mariana Lima</h4><small>Gastroenterologista</small><div class="r">★ 4,8 (96 avaliações)</div><div class="d">⌖ 1,8 km de você</div><div class="s">◷ Hoje · 15:30</div></article>
-      <article class="doc"><img src="assets/avatar-pedro.png"><h4>Dr. Pedro Mendes</h4><small>Dentista</small><div class="r">★ 4,9 (81 avaliações)</div><div class="d">⌖ 900 m de você</div><div class="s">◷ Hoje · 16:00</div></article>
-    </div>
-  </div>
-  <div>
-    <div class="panel-title"><h3>● Serviços próximos a você</h3><a href="#">Ver todos</a></div>
-    <div class="services">
-      <div class="service"><div class="service-icon">⚗</div><div><strong>Laboratório Biovale</strong><small>Exames laboratoriais</small><em>850 m · Aberto até 17:00</em></div><div>›</div></div>
-      <div class="service"><div class="service-icon">▦</div><div><strong>Clínica Vida</strong><small>Diversas especialidades</small><em>1,3 km · Aberto até 18:00</em></div><div>›</div></div>
-      <div class="service"><div class="service-icon">♥</div><div><strong>FisioMais</strong><small>Fisioterapia e reabilitação</small><em>1,1 km · Aberto até 19:00</em></div><div>›</div></div>
-    </div>
-  </div>
-</section>
 
-<section class="trust">
-  <h3>Milhares de pessoas já confiam na Avelu</h3>
-  <div class="metrics">
-    <div class="metric"><div class="micon">♟</div><div><strong>+ 50 mil</strong><small>pacientes atendidos</small></div></div>
-    <div class="metric"><div class="micon">✓</div><div><strong>+ 15 mil</strong><small>agendamentos realizados</small></div></div>
-    <div class="metric"><div class="micon">☆</div><div><strong>4,8 ★</strong><small>avaliação média</small></div></div>
-    <div class="metric"><div class="micon">♢</div><div><strong>100%</strong><small>segurança e privacidade</small></div></div>
-  </div>
-</section>
 
 <div class="cta-wrap">
   <section class="cta">
-    <div><h2>Pronto para cuidar da sua saúde?</h2><p>Cadastre-se gratuitamente e tenha uma experiência completa na Avelu.</p></div>
-    <div class="cta-actions"><a class="btn light" href="#">Cadastrar gratuitamente</a><a class="btn outline" href="#">Sou profissional de saúde</a></div>
+    <div><h2>Pronto para cuidar da sua saúde?</h2><p>Comece pela busca. Sua conta só será necessária para reservar um horário.</p></div>
+    <div class="cta-actions"><a class="btn light" href="buscar.html">Encontrar atendimento →</a></div>
   </section>
 </div>
 </main>
 
 <footer>
   <div class="footer-grid">
-    <div class="footer-brand"><img src="assets/logo.png"><small>© 2026 Avelu. Todos os direitos reservados.</small></div>
-    <div class="footer-links"><a href="#">Privacidade</a><a href="#">Termos de uso</a><a href="#">Ajuda</a><a href="#">Contato</a></div>
-    <div class="social"><span>◎</span><span>f</span><span>in</span><span>▶</span></div>
+    <div class="footer-brand"><img src="assets/logo.png" alt="Avelu"><small>© 2026 Avelu. Todos os direitos reservados.</small></div>
+    <div class="footer-links"><a href="sobre.html">Sobre a Avelu</a><a href="#como">Como funciona</a><a href="buscar.html">Agendar</a></div>
   </div>
 </footer>
 <script src="app.js" defer></script>

@@ -9,3 +9,5 @@ footer{padding:22px clamp(16px,3vw,40px) calc(30px + env(safe-area-inset-bottom)
 @media(max-width:1000px){.nav{grid-template-columns:auto 1fr auto}.navlinks{display:none}.menu{display:block}.story-grid,.values-grid{grid-template-columns:1fr}.purpose-grid{grid-template-columns:1fr 1fr}.footer-grid{grid-template-columns:1fr;justify-items:center;text-align:center}.footer-brand{justify-content:center}}
 @media(max-width:680px){header{min-height:68px}.nav{min-height:68px}.logo{width:120px}.actions{display:none}.container{width:min(100% - 32px,1180px)}.about-hero{padding:58px 0}.story-art{min-height:350px;padding:28px}.purpose-grid,.value-list{grid-template-columns:1fr}.about-cta{align-items:flex-start;flex-direction:column}.about-cta .btn{width:100%}.footer-brand{flex-direction:column}.footer-links{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+.btn-primary{background:#087653}header{flex-wrap:wrap}.mobile-nav{width:100%}a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #087653;outline-offset:3px}

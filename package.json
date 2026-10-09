@@ -8,9 +8,18 @@
     "dev": "node --watch server.js",
     "start": "node server.js",
     "db:setup": "node scripts/setup-database.js",
-    "db:migrate:pt": "node scripts/migrate-to-portuguese.js"
+    "db:setup:auth": "node scripts/setup-auth.js",
+    "db:setup:admin": "node scripts/setup-admin.js",
+    "db:setup:specialties": "node scripts/setup-specialties.js",
+    "db:setup:profiles": "node scripts/setup-profiles.js",
+    "admin:grant": "node scripts/grant-admin.js",
+    "test": "node --test tests/*.test.js",
+    "db:migrate:pt": "node scripts/migrate-to-portuguese.js",
+    "db:setup:journey": "node scripts/setup-journey.js"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "dotenv": "^16.4.7",
     "express": "^5.1.0",

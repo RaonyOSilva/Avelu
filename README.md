@@ -14,3 +14,70 @@ PWA com frontend em HTML/CSS/JavaScript, API Node.js/Express e banco MySQL.
 O Live Server ainda pode ser usado para alterações puramente visuais, mas as chamadas `/api` exigem que a página seja aberta pelo servidor Node na porta configurada.
 
 Nunca coloque a senha do MySQL em `app.js`, `index.html` ou em qualquer arquivo servido ao navegador.
+
+## Cadastro e agendamento
+
+- `perfil.html?tipo=local&id=ID` e `perfil.html?tipo=profissional&id=ID`: perfis públicos acessados pelos resultados da busca, com apresentação, especialidades completas, contatos públicos, vínculos e ação de agendamento. O profissional leva à agenda existente; o local leva à equipe e, sem equipe publicada, orienta o contato direto.
+- Para instalações existentes, rode `npm run db:setup:profiles`. WhatsApp e e-mail público são campos próprios nos dois formulários administrativos; o e-mail interno da conta não é exposto. O número de WhatsApp deve ser informado explicitamente (o telefone não é convertido automaticamente). Notas ilustrativas não são exibidas; o perfil informa que avaliações de pacientes estarão disponíveis em uma próxima etapa. Esta etapa não implementa envio de avaliações.
+
+- `buscar.html` (menu **Agendar**): descoberta pública com busca única, alternância entre locais e profissionais, filtro de tipo de local e cartões resumidos. Selecionar um local lista apenas os profissionais publicados vinculados a ele. Cada horário disponível pertence a um profissional e a um local publicado, com endereço e valor (ou valor a consultar).
+- A pesquisa da página inicial encaminha para essa tela, preservando o termo digitado. As listagens foram removidas da página inicial.
+- A cidade é selecionada com UF e vale para locais e profissionais. `/api/cities` lista automaticamente as cidades de locais publicados. Se houver apenas uma, ela vem selecionada; a escolha fica na URL. Profissionais são filtrados pelos locais publicados aos quais estão vinculados. Cadastros sem local não aparecem quando há filtro de cidade. Novas cidades entram no seletor ao publicar unidades nelas, sem alterar o código.
+
+- `cadastro.html`: cadastro de paciente com nome, e-mail, telefone opcional e senha (8 a 128 caracteres), com entrada automática.
+- `entrar.html`: login com e-mail e senha.
+- `agendar.html?profissional=ID`: consulta pública dos horários. Ao continuar sem sessão, o usuário entra ou se cadastra e retorna ao horário escolhido para confirmar.
+- `agendamentos.html` (Minha conta): dados pessoais, próximos atendimentos e histórico, cancelamento e remarcação de reservas futuras, além de saída da conta.
+
+Para um banco já existente, execute `npm run db:setup:auth` uma vez. O comando cria somente a tabela `sessoes` no banco definido pelo `.env`; preserva os dados existentes. Instalações novas com `npm run db:setup` também criam essa tabela.
+
+As senhas usam scrypt com salt individual. As sessões duram sete dias, ficam no MySQL com o token armazenado como hash e usam cookie HttpOnly/SameSite. As reservas exigem sessão válida no servidor e usam transação e bloqueio do horário para impedir duplicidade. Requisições que alteram dados exigem o cabeçalho Origin da aplicação. Nenhuma resposta da API é armazenada pelo service worker.
+
+Em produção, use HTTPS e `NODE_ENV=production` para ativar o cookie Secure. Configure `APP_ORIGIN` com a origem pública exata (por exemplo, `https://avelu.exemplo.com`, sem barra final) ao usar um proxy. O limite de tentativas de autenticação é por instância; uma implantação com múltiplas instâncias precisa de um limitador compartilhado.
+
+A agenda é gerenciada pelo administrador. Ainda não há confirmação de e-mail, lembretes automáticos, pagamento online nem gestão pelo próprio profissional. Perfis identificados pelo marcador de demonstração original não aparecem na busca pública. Horários vencidos ou sem local publicado e vinculado não podem ser reservados.
+
+## Administração de profissionais e locais
+
+Os dois formulários possuem seleção múltipla de especialidades e especificações, com pesquisa e resumo das escolhas. O catálogo inicial tem 65 especialidades/categorias e 403 detalhamentos, incluindo regiões como braço, perna e coluna em Ortopedia. É uma base ampla, extensível pela própria administração; não é uma lista exaustiva de títulos profissionais. Consulte `database/CATALOGO.md` para referências, estrutura e manutenção.
+
+Para atualizar uma instalação existente, execute `npm run db:setup:specialties`. As opções selecionadas aparecem no site e participam da busca pública (por exemplo, buscar “coluna”). As seleções do local e do profissional são independentes.
+
+Abra `/admin.html` com uma conta de administrador. A área tem dois cadastros independentes:
+
+- **Profissionais:** nome, profissão/título, e-mail interno, telefone, registro, apresentação, especialidades e locais de atendimento. O e-mail é obrigatório e deve ser único. O cadastro administrativo cria um perfil de diretório sem senha de acesso para o profissional.
+- **Locais:** clínica, consultório, hospital, laboratório, centro médico ou outro; endereço, cidade/UF, telefone público, site e descrição. Cadastre uma unidade por endereço. O e-mail de contato é interno.
+
+Ambos permitem criar, pesquisar, editar, publicar e despublicar. Novos registros começam como rascunho. Locais e profissionais publicados aparecem na tela Agendar. Cada profissional pode ser vinculado a vários locais, e cada local pode ter vários profissionais. O administrador seleciona um desses locais ao cadastrar cada horário.
+
+Em um banco existente, execute `npm run db:setup:admin` para criar as tabelas sem apagar registros. Novas instalações com `npm run db:setup` já incluem a estrutura. Para liberar um administrador, cadastre primeiro a conta pelo site e execute no servidor:
+
+```powershell
+npm run admin:grant -- email-da-conta@exemplo.com
+```
+
+Esse comando promove a conta informada a administrador. O formulário público sempre cria pacientes e não aceita definir permissões. A promoção é manual, apenas pelo servidor, e exige uma conta existente. A senha continua sendo aquela escolhida pelo usuário no cadastro.
+
+## Testes da administração
+
+Prepare também `npm run db:setup:admin` antes de `npm test`. Os testes cobrem bloqueio de visitantes e pacientes, validação, publicação e rascunhos, edição, vínculos, reversão de gravações inválidas e e-mail duplicado. Registros de teste são removidos ao final.
+
+Execute `npm test` com o MySQL configurado e a tabela `sessoes` preparada. Os testes iniciam um servidor em porta livre e criam usuários, perfil e horário temporários, removidos ao final. Cobrem busca pública, cadastro, credenciais inválidas, sessão, logout, isolamento entre pacientes, reserva concorrente, limite de tentativas e bloqueio de arquivos privados.
+
+## Jornada de agendamento e conta
+
+Em instalações existentes, execute `npm run db:setup:journey` depois das migrações de autenticação, locais e perfis. A migração é repetível e preserva cadastros e reservas. Acrescenta local/valor aos horários, registra uma cópia do endereço e valor na reserva e permite reservar novamente uma vaga cancelada. Horários antigos sem local permanecem no banco, mas não são oferecidos publicamente.
+
+No painel administrativo, abra **Gerenciar horários**. Selecione profissional e local publicado vinculado, informe início e fim no fuso de Brasília e o valor opcional. Intervalos sobrepostos são recusados; horários disponíveis podem ser bloqueados. A agenda usa o horário de Brasília: configure também o servidor Node e o MySQL nesse fuso ao hospedar.
+
+O paciente vê os dados antes de confirmar. Pode cancelar ou remarcar até o início do atendimento. A remarcação mantém o mesmo profissional e só libera a reserva original se a nova for gravada com sucesso. O endereço e valor reservados não mudam quando o cadastro do local é editado.
+
+A busca guarda filtros na URL e a posição no navegador ao abrir um perfil. A página inicial e os perfis não exibem estatísticas nem avaliações ilustrativas.
+
+## Recuperação por e-mail
+
+A tela **Esqueci minha senha** e a redefinição estão implementadas. Para ativar o envio, configure no servidor `RESEND_API_KEY`, `MAIL_FROM` (remetente verificado) e `APP_ORIGIN` (origem HTTPS pública, sem barra final). Integração conforme [API de envio do Resend](https://resend.com/docs/api-reference/emails/send-email). Não coloque chaves nos arquivos públicos. Sem essas configurações, a tela informa que a recuperação ainda está indisponível.
+
+Links expiram em 15 minutos, são de uso único e ficam armazenados somente como hash. O token é enviado no fragmento do link, removido da URL na abertura e não é retornado pela API. A troca de senha revoga as sessões anteriores. O endpoint não confirma a existência de uma conta; falhas de entrega são registradas no servidor sem tokens ou credenciais. O envio externo requer a configuração acima e não faz parte dos testes automáticos.
+
+Os testes também cobrem vínculo do horário ao local, sobreposição, cancelamento, nova reserva da vaga liberada, remarcação, endereço preservado, dados pessoais e recuperação com token vencido/reutilizado.

@@ -4,13 +4,40 @@ const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
 const pool = require('./db');
+const cityFilter = require('./city-filter');
+const { mountAuth } = require('./auth');
+const mountAppointments = require('./appointments');
+const mountAdmin = require('./admin');
+const mountProfiles = require('./profiles');
+const { catalog, attachSelection } = require('./specialties');
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json({ limit: '100kb' }));
-app.use(express.static(__dirname, { extensions: ['html'] }));
+app.use('/api', (request, response, next) => {
+  response.set('Cache-Control', 'no-store');
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+    const expectedOrigin = process.env.APP_ORIGIN || `${request.protocol}://${request.get('host')}`;
+    if (request.get('origin') !== expectedOrigin) return response.status(403).json({ error: 'Origem da solicitação não permitida.' });
+  }
+  next();
+});
+// Sirva apenas arquivos públicos: código do servidor e SQL ficam privados.
+const publicFiles = new Set(['recuperar.html', 'recuperar.js', 'agenda-admin.html', 'agenda-admin.js', 'index.html', 'sobre.html', 'buscar.html', 'buscar.js', 'buscar.css', 'perfil.html', 'perfil.js', 'perfil.css', 'cadastro.html', 'entrar.html', 'agendar.html', 'agendamentos.html', 'admin.html', 'admin-ui.js', 'admin.css', 'paginas.css', 'conta.css', 'app.js', 'conta.js', 'service-worker.js', 'manifest.webmanifest']);
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
+app.use((request, response, next) => {
+  const file = request.path === '/' ? 'index.html' : request.path.slice(1);
+  if (['GET', 'HEAD'].includes(request.method) && publicFiles.has(file)) return response.sendFile(path.join(__dirname, file), { headers: { 'Cache-Control': 'no-cache' } });
+  next();
+});
+
+mountAuth(app);
+require('./account')(app);
+mountAppointments(app);
+mountAdmin(app);
+mountProfiles(app);
 
 app.get('/api/health', async (_request, response, next) => {
   try {
@@ -23,10 +50,7 @@ app.get('/api/health', async (_request, response, next) => {
 
 app.get('/api/specialties', async (_request, response, next) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT id, nome, slug FROM especialidades WHERE ativo = 1 ORDER BY nome'
-    );
-    response.json(rows);
+    response.json(await catalog());
   } catch (error) {
     next(error);
   }
@@ -35,6 +59,10 @@ app.get('/api/specialties', async (_request, response, next) => {
 app.get('/api/professionals', async (request, response, next) => {
   try {
     const term = String(request.query.q || '').trim();
+    const local = String(request.query.local || '');
+    const city = cityFilter(request.query);
+    if(!city)return response.status(400).json({error:'Informe uma cidade e UF válidas.'});
+    if (local && !/^[1-9]\d{0,14}$/.test(local)) return response.status(400).json({error:'Local inválido.'});
     const like = `%${term}%`;
     const [rows] = await pool.execute(
       `SELECT p.id, u.nome_completo AS name, p.titulo_profissional AS specialty,
@@ -45,16 +73,19 @@ app.get('/api/professionals', async (request, response, next) => {
          JOIN usuarios u ON u.id = p.usuario_id
     LEFT JOIN disponibilidades d ON d.profissional_id = p.id
                                   AND d.status = 'disponivel'
-                                  AND d.inicio_em >= NOW()
-        WHERE p.ativo = 1
-          AND (? = '' OR u.nome_completo LIKE ? OR p.titulo_profissional LIKE ?)
+                                  AND d.inicio_em >= NOW() AND EXISTS (SELECT 1 FROM locais_atendimento dl JOIN profissionais_locais dp ON dp.local_id=dl.id WHERE dl.id=d.local_id AND dl.ativo=1 AND dp.profissional_id=p.id AND (?='' OR dl.id=?) AND (?='' OR (TRIM(dl.cidade)=? AND dl.estado=?)))
+        WHERE p.ativo = 1 AND u.ativo=1 AND u.senha_hash <> 'CONTA_DEMONSTRACAO_SEM_LOGIN'
+          AND ((? = '' AND ? = '') OR EXISTS (SELECT 1 FROM profissionais_locais pl JOIN locais_atendimento l ON l.id=pl.local_id WHERE pl.profissional_id=p.id AND l.ativo=1 AND (?='' OR l.id=?) AND (?='' OR (TRIM(l.cidade)=? AND l.estado=?))))
+          AND (? = '' OR u.nome_completo LIKE ? OR p.titulo_profissional LIKE ?
+            OR EXISTS (SELECT 1 FROM profissionais_especialidades pe JOIN especialidades e ON e.id=pe.especialidade_id WHERE pe.profissional_id=p.id AND e.ativo=1 AND e.nome LIKE ?)
+            OR EXISTS (SELECT 1 FROM profissionais_areas pa JOIN areas_especialidades a ON a.id=pa.area_id JOIN especialidades e ON e.id=a.especialidade_id WHERE pa.profissional_id=p.id AND a.ativo=1 AND e.ativo=1 AND a.nome LIKE ?))
         GROUP BY p.id, u.nome_completo, p.titulo_profissional, p.avaliacao,
                  p.quantidade_avaliacoes, p.distancia_km, p.avatar_url
         ORDER BY next_available_at IS NULL, next_available_at, p.avaliacao DESC
         LIMIT 30`,
-      [term, like, like]
+      [local, local, city.city, city.city, city.state, local, city.city, local, local, city.city, city.city, city.state, term, like, like, like, like]
     );
-    response.json(rows);
+    response.json(await attachSelection(rows, 'professional', true));
   } catch (error) {
     next(error);
   }
@@ -65,16 +96,15 @@ app.use('/api', (_request, response) => {
 });
 
 app.use((error, _request, response, _next) => {
-  console.error(error);
+  console.error('Falha na API:', error.code || error.name);
+  if (error.type === 'entity.parse.failed') return response.status(400).json({ error: 'Dados inválidos.' });
   response.status(500).json({ error: 'Não foi possível concluir a operação.' });
 });
 
-app.get('*path', (_request, response) => {
-  response.sendFile(path.join(__dirname, 'index.html'));
-});
+app.use((_request, response) => response.status(404).send('Página não encontrada.'));
 
 const server = app.listen(port, () => {
-  console.log(`Avelu disponível em http://localhost:${port}`);
+  console.log(`Avelu disponível em http://localhost:${server.address().port}`);
 });
 
 async function shutdown() {
