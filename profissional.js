@@ -43,10 +43,11 @@ function render(){
  if(view==='cancelled'&&slot.motivo_cancelamento)card.append(node('p',slot.motivo_cancelamento));
  if(view==='confirmado'){
  const actions=node('div','','patient-actions'),perform=node('button','Realizar atendimento','btn btn-primary'),cancel=node('button','Cancelar atendimento','btn btn-light cancel-button');
- perform.type=cancel.type='button';perform.disabled=new Date(slot.inicio_em)>new Date();
- perform.addEventListener('click',()=>openAction(slot,'concluido'));cancel.addEventListener('click',()=>openAction(slot,'cancelado'));actions.append(perform,cancel);card.append(actions);
- if(perform.disabled)card.append(node('small','Disponível para realizar a partir do horário agendado.'));
+ perform.type=cancel.type='button';perform.disabled=slot.inicio_em.slice(0,10)!==today();
+ perform.addEventListener('click',()=>location.assign('consulta.html?id='+slot.agendamento_id));cancel.addEventListener('click',()=>openAction(slot,'cancelado'));actions.append(perform,cancel);card.append(actions);
+ if(perform.disabled)card.append(node('small','Disponível para realizar em qualquer horário na data agendada.'));
  }
+ if(view==='concluido'){const link=node('a','Ver registro e imprimir','btn btn-light');link.href='consulta.html?id='+slot.agendamento_id;card.append(link);}
  list.append(card);
  });
 }

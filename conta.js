@@ -5,7 +5,7 @@ function safeNext(value) {
   if (!value) return '/agendamentos.html';
   try {
     const url = new URL(value, location.origin);
-    if (url.origin === location.origin && ['/agendar.html', '/agendamentos.html', '/admin.html', '/agenda-admin.html', '/profissional.html', '/atendimento.html', '/equipe.html'].includes(url.pathname)) return url.pathname + url.search;
+    if (url.origin === location.origin && ['/agendar.html', '/agendamentos.html', '/admin.html', '/agenda-admin.html', '/consulta.html', '/profissional.html', '/atendimento.html', '/equipe.html'].includes(url.pathname)) return url.pathname + url.search;
   } catch { /* Use o destino padrão para URLs inválidas. */ }
   return '/agendamentos.html';
 }

@@ -111,6 +111,32 @@ test('área de atendimento: isolamento, agenda online e recepção',{timeout:400
       assert.equal((await request('/api/professional/appointments/'+confirmed.agendamento_id+'/state',{status:'confirmado'},doctor)).status,403);
       assert.equal((await request('/api/auth/me',null,doctor)).data.user.isProfessional,true);
     });
+
+    await t.test('registro clínico é privado, persiste rascunhos e finaliza de forma atômica',async()=>{
+      await require('../scripts/setup-consultations').setupConsultations(pool);
+      const [appointments]=await pool.execute("SELECT id FROM agendamentos WHERE disponibilidade_id=? AND status='confirmado'",[slotA]);
+      const id=appointments[0].id,url='/api/consultations/'+id;
+      assert.equal((await request(url)).status,401);
+      for(const actor of [patient,secretary,other,admin])assert.equal((await request(url,null,actor)).status,404);
+      const initial=await request(url,null,doctor);assert.equal(initial.status,200);assert.equal(initial.data.record.versao,0);
+      assert.equal(initial.data.appointment.profissional,'medico');assert.ok(!JSON.stringify(initial.data).includes('senha_hash'));
+      const draft={evolucao:'Avaliação registrada pelo profissional.\nConduta de teste.',receita:'Texto de receita de teste.',versao:0,finalizar:false};
+      assert.equal((await request(url,draft,doctor)).status,409);
+      const currentDay=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+      await pool.execute("UPDATE disponibilidades SET inicio_em='2020-01-01 08:00:00',fim_em='2020-01-01 08:30:00' WHERE id=?",[slotA]);
+      assert.equal((await request(url,draft,doctor)).status,409);
+      await pool.execute('UPDATE disponibilidades SET inicio_em=?,fim_em=? WHERE id=?',[currentDay+' 23:58:00',currentDay+' 23:59:00',slotA]);
+      assert.equal((await request(url,draft,secretary)).status,404);
+      const saved=await request(url,draft,doctor);assert.equal(saved.status,200);assert.equal(saved.data.record.versao,1);
+      assert.equal((await request(url,null,doctor)).data.record.evolucao,draft.evolucao);
+      assert.equal((await request(url,draft,doctor)).status,409);
+      assert.equal((await request(url,{...draft,versao:1,evolucao:'',finalizar:true},doctor)).status,400);
+      const final=await request(url,{...draft,versao:1,finalizar:true},doctor);assert.equal(final.status,200);assert.equal(final.data.status,'concluido');
+      assert.ok(final.data.record.finalizado_em);
+      assert.equal((await request(url,{...draft,versao:2},doctor)).status,409);
+      assert.equal((await request(url,null,doctor)).data.record.receita,draft.receita);
+      const [status]=await pool.execute('SELECT status FROM agendamentos WHERE id=?',[id]);assert.equal(status[0].status,'concluido');
+    });
     await t.test('primeiro acesso não altera a senha de contas existentes e revogação é imediata',async()=>{
       const created=await request('/api/admin/team-access',{email:createdEmail,nome:'Nova secretária',senha:'Senha inicial 123',tipo:'local',escopo_id:places[0]},admin);assert.equal(created.status,201);
       const login=await request('/api/auth/login',{email:createdEmail,password:'Senha inicial 123'});assert.equal(login.status,200);assert.equal(login.data.user.canManage,true);users.push(login.data.user.id);

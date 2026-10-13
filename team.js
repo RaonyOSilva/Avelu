@@ -175,11 +175,12 @@ module.exports = function mountTeam(app) {
     if(!validId(req.params.id)||!['confirmado','cancelado','concluido'].includes(b.status)||(b.status==='cancelado'&&(typeof b.motivo!=='string'||!b.motivo.trim()||b.motivo.length>500||typeof b.liberar!=='boolean')))return res.status(400).json({error:'Informe uma ação válida e o motivo do cancelamento.'});
     await transaction(res,next,async c=>{
       const access=scope(req.user);
-      const [rows]=await c.execute(`SELECT a.id,a.status,a.disponibilidade_id,d.inicio_em FROM agendamentos a JOIN disponibilidades d ON d.id=a.disponibilidade_id WHERE a.id=? AND ${access.sql} FOR UPDATE`,[req.params.id,...access.values]);
+      const [rows]=await c.execute(`SELECT a.id,a.status,a.disponibilidade_id,d.inicio_em,DATE_FORMAT(d.inicio_em,'%Y-%m-%d') AS dia FROM agendamentos a JOIN disponibilidades d ON d.id=a.disponibilidade_id WHERE a.id=? AND ${access.sql} FOR UPDATE`,[req.params.id,...access.values]);
       const appointment=rows[0];if(!appointment)throw fail('Agendamento não encontrado.',404);
       if(req.user.ownProfessionalId && (appointment.status!=='confirmado'||b.liberar===true))throw fail('Somente atendimentos confirmados podem ser realizados ou cancelados. A reabertura de horários cabe à equipe.');
       if(!['agendado','confirmado'].includes(appointment.status))throw fail('Este agendamento já foi encerrado.');
-      if(b.status==='concluido'&&new Date(appointment.inicio_em)>new Date())throw fail('O atendimento ainda não começou.');
+      if(b.status==='concluido'&&req.user.ownProfessionalId&&appointment.dia!==new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()))throw fail('O atendimento pode ser realizado somente na data agendada.');
+      if(b.status==='concluido'&&!req.user.ownProfessionalId&&new Date(appointment.inicio_em)>new Date())throw fail('O atendimento ainda não começou.');
       if(b.status==='confirmado'&&appointment.status!=='agendado')throw fail('O atendimento já está confirmado.');
       await c.execute('UPDATE agendamentos SET status=?,motivo_cancelamento=? WHERE id=?',[b.status,b.status==='cancelado'?b.motivo.trim():null,appointment.id]);
       if(b.status==='cancelado')await c.execute('UPDATE disponibilidades SET status=? WHERE id=?',[b.liberar?'disponivel':'bloqueado',appointment.disponibilidade_id]);

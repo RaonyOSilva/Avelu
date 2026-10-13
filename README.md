@@ -108,3 +108,13 @@ O banco utiliza `gestao_acessos` para os vínculos e campos próprios para pacie
 ## Agendamento pelo perfil do local
 
 O botão **Agendar atendimento** no perfil do local abre `agendar-local.html?local=ID`. A tela mostra os profissionais publicados vinculados à unidade e consulta a disponibilidade de cada um com o filtro `local`. Cada cartão apresenta dias e horários selecionáveis, com valor ou indicação de consulta do valor. O paciente escolhe a vaga e continua no fluxo existente de revisão e login, preservando local, profissional e horário. A tela oferece contatos quando não há equipe ou horários e nova tentativa quando a agenda falha. A navegação de volta na confirmação retorna aos profissionais do local. Não foi necessário alterar o banco.
+
+
+### Registro do atendimento
+Em `profissional.html`, **Realizar atendimento** abre `consulta.html?id=...` sem concluir a agenda.
+O profissional responsável pode salvar evolução e receita como rascunho e finalizar o atendimento.
+Registros finalizados ficam disponíveis em **Realizados → Ver registro e imprimir**, somente para leitura.
+A impressão oferece registro completo ou somente receita, com identificação e espaço para assinatura.
+Não implementa assinatura digital nem modelos especiais de receituário.
+Instalações existentes: execute `npm run db:setup:consultations`.
+A API restringe os registros ao profissional titular, valida o horário e evita sobrescrita por abas concorrentes.
