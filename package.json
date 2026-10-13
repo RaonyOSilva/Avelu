@@ -15,7 +15,8 @@
     "admin:grant": "node scripts/grant-admin.js",
     "test": "node --test tests/*.test.js",
     "db:migrate:pt": "node scripts/migrate-to-portuguese.js",
-    "db:setup:journey": "node scripts/setup-journey.js"
+    "db:setup:journey": "node scripts/setup-journey.js",
+    "db:setup:team": "node scripts/setup-team.js"
   },
   "engines": {
     "node": ">=20"

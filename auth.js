@@ -1,6 +1,7 @@
 const { randomBytes, scrypt: scryptCallback, timingSafeEqual, createHash } = require('node:crypto');
 const { promisify } = require('node:util');
 const pool = require('./db');
+const { canManage } = require('./team-permissions');
 const scrypt = promisify(scryptCallback);
 const cookieName = 'avelu_session';
 const sessionDuration = 7 * 24 * 60 * 60 * 1000;
@@ -32,13 +33,19 @@ async function createSession(request, response, userId) {
   response.cookie(cookieName, token, { ...cookieOptions, maxAge: sessionDuration });
 }
 
+async function hasProfessionalProfile(userId) {
+  const [rows]=await pool.execute('SELECT id FROM perfis_profissionais WHERE usuario_id=? AND ativo=1 LIMIT 1',[userId]);
+  return rows.length>0;
+}
+
 async function currentUser(request) {
   const token = sessionToken(request);
   if (!token) return null;
   const [rows] = await pool.execute(`SELECT u.id, u.nome_completo AS name, u.email, u.tipo AS role
     FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
     WHERE s.token_hash = ? AND s.expira_em > NOW() AND u.ativo = 1`, [hashToken(token)]);
-  return rows[0] || null;
+  if (!rows.length) return null;
+  return { ...rows[0], canManage: await canManage(rows[0]), isProfessional: await hasProfessionalProfile(rows[0].id) };
 }
 
 async function requireUser(request, response, next) {
@@ -104,6 +111,8 @@ function mountAuth(app) {
       if (!(await verifyPassword(password, user?.senha_hash)) || !user) return response.status(401).json({ error: 'E-mail ou senha incorretos.' });
       await createSession(request, response, user.id);
       delete user.senha_hash;
+      user.canManage = await canManage(user);
+      user.isProfessional = await hasProfessionalProfile(user.id);
       response.json({ user });
     } catch (error) { next(error); }
   });
@@ -129,4 +138,4 @@ async function requireAdmin(request, response, next) {
   } catch (error) { next(error); }
 }
 
-module.exports = { mountAuth, requireUser, requireAdmin, currentUser, passwordHash, authLimit };
+module.exports = { mountAuth, requireUser, requireAdmin, currentUser, passwordHash, verifyPassword, authLimit };

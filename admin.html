@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="pt-BR">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0ea56b"><title>Administração — Avelu</title><link rel="icon" href="assets/icon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="paginas.css"><link rel="stylesheet" href="conta.css"><link rel="stylesheet" href="admin.css"></head>
-<body><a class="skip" href="#conteudo">Pular para o conteúdo</a><header><nav class="container account-nav" aria-label="Navegação principal"><a href="index.html"><img class="logo" src="assets/logo.png" alt="Avelu — início"></a><div class="admin-nav"><a href="agenda-admin.html">Gerenciar horários</a><a href="index.html">Ver site ↗</a><button id="logout" class="btn btn-light" type="button" hidden>Sair</button></div></nav></header>
+<body><a class="skip" href="#conteudo">Pular para o conteúdo</a><header><nav class="container account-nav" aria-label="Navegação principal"><a href="index.html"><img class="logo" src="assets/logo.png" alt="Avelu — início"></a><div class="admin-nav"><a href="atendimento.html">Área de atendimento</a><a href="equipe.html">Acessos da equipe</a><a href="index.html">Ver site ↗</a><button id="logout" class="btn btn-light" type="button" hidden>Sair</button></div></nav></header>
 <main class="container admin-main" id="conteudo"><div class="admin-heading"><div><span class="eyebrow">Área administrativa</span><h1>Conecte pessoas ao <span>cuidado.</span></h1><p class="muted">Cadastre profissionais e organize os locais onde eles atendem.</p></div></div>
 <p id="access-status" role="status">Verificando seu acesso…</p><p id="admin-message" class="form-message" role="alert"></p>
 <div id="admin-content" hidden>
@@ -19,7 +19,7 @@
 <div id="place-list" class="record-list" aria-live="polite"></div>
 </section>
 <section id="professional-editor" class="booking-card editor" hidden aria-labelledby="professional-form-title">
-<h2 id="professional-form-title" tabindex="-1">Novo profissional</h2><p class="muted">Este cadastro cria o perfil no site. Depois de vincular um local publicado, acesse Gerenciar horários para abrir a agenda.</p>
+<h2 id="professional-form-title" tabindex="-1">Novo profissional</h2><p class="muted">Este cadastro cria o perfil no site. Depois de vincular um local publicado, acesse Área de atendimento para abrir a agenda.</p>
 <form id="professional-form"><input type="hidden" name="id"><div class="form-grid">
 <div class="field"><label for="p-nome">Nome de exibição *</label><input id="p-nome" name="nome" maxlength="150" required placeholder="Ex.: Dra. Mariana Lima"></div>
 <div class="field"><label for="p-titulo">Profissão / título *</label><input id="p-titulo" name="titulo" maxlength="150" required placeholder="Ex.: Psicóloga, Cardiologista"></div>

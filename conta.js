@@ -5,7 +5,7 @@ function safeNext(value) {
   if (!value) return '/agendamentos.html';
   try {
     const url = new URL(value, location.origin);
-    if (url.origin === location.origin && ['/agendar.html', '/agendamentos.html', '/admin.html', '/agenda-admin.html'].includes(url.pathname)) return url.pathname + url.search;
+    if (url.origin === location.origin && ['/agendar.html', '/agendamentos.html', '/admin.html', '/agenda-admin.html', '/profissional.html', '/atendimento.html', '/equipe.html'].includes(url.pathname)) return url.pathname + url.search;
   } catch { /* Use o destino padrão para URLs inválidas. */ }
   return '/agendamentos.html';
 }
@@ -22,9 +22,20 @@ function loginFor(target) { location.assign(`/entrar.html?next=${encodeURICompon
 function dateLabel(value) { return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date(value)); }
 function node(tag, value, className) { const element = document.createElement(tag); element.textContent = value; if (className) element.className = className; return element; }
 
+if (page === 'login' && ['/profissional.html', '/atendimento.html','/equipe.html','/agenda-admin.html'].includes(next.split('?')[0])) {
+  document.title = next.startsWith('/profissional.html') ? 'Acesso do profissional — Avelu' : 'Acesso da equipe — Avelu';
+  document.querySelector('.account-intro .eyebrow').textContent = 'Área de atendimento';
+  document.querySelector('.account-intro h1').textContent = 'Sua agenda começa aqui.';
+  document.querySelector('.account-intro .lead').textContent = 'Entre com sua conta de profissional ou recepção para gerenciar os atendimentos.';
+  document.querySelector('.benefits').replaceChildren(...['Disponibilize horários online','Confirme e organize os atendimentos','Agende pacientes pela recepção'].map(text => node('li', text)));
+  document.querySelector('#form-title').textContent = next.startsWith('/profissional.html') ? 'Entrar na minha agenda' : 'Entrar na área da equipe';
+  const note = document.querySelector('.account-switch');
+  note.textContent = 'Ainda não tem acesso? Solicite a liberação ao administrador da Avelu.';
+}
 if (page === 'register' || page === 'login') {
   document.querySelector('#return-note').hidden = !next.startsWith('/agendar.html');
-  document.querySelector('#switch-auth').href = `${page === 'login' ? 'cadastro' : 'entrar'}.html?next=${encodeURIComponent(next)}`;
+  const switchAuth = document.querySelector('#switch-auth');
+  if (switchAuth) switchAuth.href = `${page === 'login' ? 'cadastro' : 'entrar'}.html?next=${encodeURIComponent(next)}`;
   document.querySelector('#toggle-password').addEventListener('click', event => {
     const input = document.querySelector('#password');
     const show = input.type === 'password';
@@ -41,7 +52,7 @@ if (page === 'register' || page === 'login') {
     button.disabled = true; button.textContent = 'Aguarde…';
     try {
       const result = await api(`/api/auth/${page}`, { method: 'POST', body: JSON.stringify(data) });
-      location.assign(result.user.role === 'administrador' && !params.has('next') ? '/admin.html' : next);
+      location.assign(params.has('next') ? next : result.user.role === 'administrador' ? '/admin.html' : result.user.isProfessional ? '/profissional.html' : result.user.canManage ? '/atendimento.html' : next);
     } catch (error) { message.textContent = error.message; }
     finally { button.disabled = false; button.textContent = original; }
   });
@@ -63,6 +74,7 @@ if(page==='booking'){
    const summary=document.querySelector('#professional-summary');const img=document.createElement('img');img.src=data.professional.avatar_url||'assets/icon.svg';img.alt='';const description=node('div','');description.append(node('h2',data.professional.name),node('p',data.professional.specialty,'muted'));summary.replaceChildren(img,description);
    document.title='Agendar com '+data.professional.name+' — Avelu';
    const back=document.querySelector('#booking-back');back.href='perfil.html?tipo=profissional&id='+professionalId+(params.get('local')?'&local='+encodeURIComponent(params.get('local')):'');back.textContent='← Voltar ao perfil';
+   if(params.get('origem')==='local'&&/^[1-9]\d{0,14}$/.test(params.get('local')||'')){back.href='agendar-local.html?local='+encodeURIComponent(params.get('local'));back.textContent='← Voltar aos profissionais e horários do local';}
    const slots=document.querySelector('#slots');slots.replaceChildren();
    for(const slot of available){const label=node('label','','slot'),radio=document.createElement('input');radio.type='radio';radio.name='slotId';radio.value=slot.id;radio.required=true;radio.checked=String(slot.id)===params.get('horario');const details=node('span','','slot-details');details.append(node('strong',dateLabel(slot.inicio_em)),node('span',slot.local_nome),node('small',slot.local_endereco),node('span',priceLabel(slot.valor)));label.append(radio,details);slots.append(label);}
    document.querySelector('#empty-slots').hidden=available.length>0;form.hidden=!available.length;updateReview();

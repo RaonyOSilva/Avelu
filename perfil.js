@@ -32,9 +32,9 @@ async function load(){
     for(const item of data.relacionados){const card=node('article','','related-card');const info=node('div','');info.append(node('strong',item.nome),node('p',isPlace?item.titulo:address(item)));const link=node('a','Ver perfil →');link.href=profileLink(isPlace?'profissional':'local',item.id)+(isPlace?`&local=${id}`:'');link.setAttribute('aria-label',`Ver perfil de ${item.nome}`);card.append(info,link);list.append(card);}
     if(!data.relacionados.length)list.append(node('p',isPlace?'Ainda não há profissionais publicados neste local. Entre em contato para consultar atendimentos.':'Nenhum local de atendimento informado.'));
     const schedule=document.querySelector('#schedule');
-    schedule.href=isPlace?(data.relacionados.length?'#relacionados':'#contatos'):`agendar.html?profissional=${id}${/^[1-9]\d{0,14}$/.test(params.get('local')||'')?'&local='+params.get('local'):''}`;
-    schedule.textContent=isPlace&&!data.relacionados.length?'Consultar agendamento':'Agendar atendimento';
-    document.querySelector('#schedule-note').textContent=isPlace?(data.relacionados.length?'Escolha um dos profissionais deste local para consultar a disponibilidade.':'Fale com o local para saber sobre horários e disponibilidade.'):'Consulte os horários disponíveis e escolha o melhor para você.';
+    schedule.href=isPlace?`agendar-local.html?local=${id}`:`agendar.html?profissional=${id}${/^[1-9]\d{0,14}$/.test(params.get('local')||'')?'&local='+params.get('local'):''}`;
+    schedule.textContent='Agendar atendimento';
+    document.querySelector('#schedule-note').textContent=isPlace?'Veja os profissionais e escolha um horário disponível nesta unidade.':'Consulte os horários disponíveis e escolha o melhor para você.';
     if(isPlace){contact('Endereço',address(data));if(data.cep)contact('CEP',data.cep.replace(/^(\d{5})(\d{3})$/,'$1-$2'));contact('Mapa','Ver como chegar',`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address(data))}`);}
     if(data.telefone){contact('Telefone',phone(data.telefone),`tel:${data.telefone}`);const call=document.querySelector('#call');call.hidden=false;call.href=`tel:${data.telefone}`;call.textContent=`Ligar: ${phone(data.telefone)}`;}
     if(data.whatsapp&&/^\d{10,15}$/.test(data.whatsapp)){const href=`https://wa.me/${data.whatsapp}`;contact('WhatsApp',phone(data.whatsapp),href);const button=document.querySelector('#whatsapp');button.href=href;button.hidden=false;}else contact('WhatsApp','Ainda não informado');
@@ -45,5 +45,5 @@ async function load(){
     document.querySelector('#profile').hidden=false;status.hidden=true;
   }catch(error){status.textContent=error.name==='TimeoutError'?'O carregamento demorou mais que o esperado.':error.message;const retry=node('button','Tentar novamente','btn btn-light');retry.addEventListener('click',()=>location.reload());status.append(retry);}
 }
-fetch('/api/auth/me').then(response=>response.ok?response.json():null).then(session=>{if(session?.user){const link=document.querySelector('#account-link');link.href=session.user.role==='administrador'?'admin.html':'agendamentos.html';link.textContent=session.user.role==='administrador'?'Administrar':'Minha conta';}}).catch(()=>{});
+fetch('/api/auth/me').then(response=>response.ok?response.json():null).then(session=>{if(session?.user){const link=document.querySelector('#account-link');link.href=session.user.role==='administrador'?'admin.html':session.user.canManage?'atendimento.html':'agendamentos.html';link.textContent=session.user.role==='administrador'?'Administrar':session.user.canManage?'Área de atendimento':'Minha conta';}}).catch(()=>{});
 load();

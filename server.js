@@ -25,7 +25,7 @@ app.use('/api', (request, response, next) => {
   next();
 });
 // Sirva apenas arquivos públicos: código do servidor e SQL ficam privados.
-const publicFiles = new Set(['recuperar.html', 'recuperar.js', 'agenda-admin.html', 'agenda-admin.js', 'index.html', 'sobre.html', 'buscar.html', 'buscar.js', 'buscar.css', 'perfil.html', 'perfil.js', 'perfil.css', 'cadastro.html', 'entrar.html', 'agendar.html', 'agendamentos.html', 'admin.html', 'admin-ui.js', 'admin.css', 'paginas.css', 'conta.css', 'app.js', 'conta.js', 'service-worker.js', 'manifest.webmanifest']);
+const publicFiles = new Set(['profissional.html','profissional.js','profissional.css','agendar-local.html', 'agendar-local.js', 'agendar-local.css', 'atendimento.html', 'atendimento.js', 'atendimento.css', 'equipe.html', 'equipe.js', 'recuperar.html', 'recuperar.js', 'agenda-admin.html', 'agenda-admin.js', 'index.html', 'sobre.html', 'buscar.html', 'buscar.js', 'buscar.css', 'perfil.html', 'perfil.js', 'perfil.css', 'cadastro.html', 'entrar.html', 'agendar.html', 'agendamentos.html', 'admin.html', 'admin-ui.js', 'admin.css', 'paginas.css', 'conta.css', 'app.js', 'conta.js', 'service-worker.js', 'manifest.webmanifest']);
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use((request, response, next) => {
   const file = request.path === '/' ? 'index.html' : request.path.slice(1);
@@ -38,6 +38,8 @@ require('./account')(app);
 mountAppointments(app);
 mountAdmin(app);
 mountProfiles(app);
+require('./team-access')(app);
+require('./team')(app);
 
 app.get('/api/health', async (_request, response, next) => {
   try {

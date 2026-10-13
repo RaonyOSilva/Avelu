@@ -115,7 +115,7 @@ form.elements.tipo.addEventListener('change',()=>load());
 form.elements.city.addEventListener('change',()=>{local=null;localId='';load();});
 document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>{view=button.dataset.view;if(view==='locais'){local=null;localId='';}load();}));
 document.querySelector('#clear-local').addEventListener('click',()=>{view='locais';local=null;localId='';form.elements.q.value='';load();});
-api('/api/auth/me').then(({user})=>{if(user){const link=document.querySelector('#account-link');link.href=user.role==='administrador'?'admin.html':'agendamentos.html';link.textContent=user.role==='administrador'?'Administrar':'Minha conta';}}).catch(()=>{});
+api('/api/auth/me').then(({user})=>{if(user){const link=document.querySelector('#account-link');link.href=user.role==='administrador'?'admin.html':user.canManage?'atendimento.html':'agendamentos.html';link.textContent=user.role==='administrador'?'Administrar':user.canManage?'Área de atendimento':'Minha conta';}}).catch(()=>{});
 load();
 
 results.addEventListener('click',event=>{if(!event.target.closest('a[href^="perfil.html"]'))return;try{sessionStorage.setItem('avelu-search',JSON.stringify({url:location.pathname+location.search,scroll:window.scrollY}));}catch{}});

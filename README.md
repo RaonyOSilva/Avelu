@@ -35,7 +35,7 @@ As senhas usam scrypt com salt individual. As sessões duram sete dias, ficam no
 
 Em produção, use HTTPS e `NODE_ENV=production` para ativar o cookie Secure. Configure `APP_ORIGIN` com a origem pública exata (por exemplo, `https://avelu.exemplo.com`, sem barra final) ao usar um proxy. O limite de tentativas de autenticação é por instância; uma implantação com múltiplas instâncias precisa de um limitador compartilhado.
 
-A agenda é gerenciada pelo administrador. Ainda não há confirmação de e-mail, lembretes automáticos, pagamento online nem gestão pelo próprio profissional. Perfis identificados pelo marcador de demonstração original não aparecem na busca pública. Horários vencidos ou sem local publicado e vinculado não podem ser reservados.
+A agenda é gerenciada pelo administrador e pelas equipes autorizadas na Área de atendimento. Ainda não há confirmação de e-mail, lembretes automáticos nem pagamento online. Perfis identificados pelo marcador de demonstração original não aparecem na busca pública. Horários vencidos ou sem local publicado e vinculado não podem ser reservados.
 
 ## Administração de profissionais e locais
 
@@ -81,3 +81,30 @@ A tela **Esqueci minha senha** e a redefinição estão implementadas. Para ativ
 Links expiram em 15 minutos, são de uso único e ficam armazenados somente como hash. O token é enviado no fragmento do link, removido da URL na abertura e não é retornado pela API. A troca de senha revoga as sessões anteriores. O endpoint não confirma a existência de uma conta; falhas de entrega são registradas no servidor sem tokens ou credenciais. O envio externo requer a configuração acima e não faz parte dos testes automáticos.
 
 Os testes também cobrem vínculo do horário ao local, sobreposição, cancelamento, nova reserva da vaga liberada, remarcação, endereço preservado, dados pessoais e recuperação com token vencido/reutilizado.
+
+## Área de atendimento (profissionais e recepção)
+
+Para atualizar uma instalação existente com as migrações anteriores aplicadas, execute `npm run db:setup:team` e reinicie o servidor. A migração é repetível e mantém reservas existentes. Instalações novas com `npm run db:setup` já incluem essa estrutura.
+
+1. Entre como administrador em `/admin.html` e abra **Acessos da equipe**.
+2. Informe o e-mail da pessoa e escolha um vínculo: **profissional**, para sua agenda em todos os locais, ou **local**, para atendimentos somente naquela unidade. É possível conceder vários vínculos ao mesmo e-mail.
+3. Se a conta ainda não existe, preencha nome e senha inicial no bloco Primeiro acesso. Para um profissional cadastrado no diretório sem senha, a senha inicial habilita o login. Uma conta existente com senha mantém a senha atual. Perfis de demonstração não recebem acesso.
+4. A pessoa entra normalmente em `/entrar.html` e acessa `/atendimento.html`. Pode trocar a própria senha no menu Minha senha. A troca encerra as sessões anteriores. Não são enviados convites automáticos.
+
+Na Área de atendimento é possível:
+
+- Filtrar a agenda por dia, profissional e unidade, com resumo de vagas livres, a confirmar, confirmadas e canceladas.
+- Publicar um intervalo de até 12 horas dividido em consultas, por exemplo, 08h–12h em consultas de 30 minutos. O intervalo precisa ser divisível pela duração. Preencha uma data por publicação; recorrência semanal ainda não está incluída.
+- Bloquear ou reabrir vagas futuras. Intervalos sobrepostos do mesmo profissional são recusados, inclusive em outra unidade.
+- Selecionar **Agendar paciente** em uma vaga livre e registrar nome, telefone e e-mail opcional. A reserva manual usa a mesma proteção contra concorrência da reserva online.
+- Confirmar, cancelar com motivo e concluir atendimentos já iniciados. Ao cancelar, a equipe escolhe se libera a vaga novamente ou a mantém bloqueada.
+
+Um agendamento manual não cria uma conta nem é associado automaticamente a um usuário pelo e-mail informado. Ele fica disponível à equipe autorizada; não aparece automaticamente na conta pessoal do paciente. Reservas feitas pelo site continuam aparecendo para o paciente com o status atualizado. A equipe deve comunicar cancelamentos e confirmações por seus canais: não há envio automático de e-mail ou WhatsApp.
+
+As permissões são verificadas no servidor em cada consulta e alteração. Um vínculo de local não permite acessar atendimentos do mesmo profissional em outra unidade. Somente o administrador da Avelu concede ou revoga vínculos; as equipes não podem se promover nem cadastrar permissões. A revogação vale na próxima requisição, mesmo com sessão aberta. Administradores mantêm acesso global. As ações da equipe na agenda são registradas em `agenda_eventos` com usuário, horário e ação.
+
+O banco utiliza `gestao_acessos` para os vínculos e campos próprios para pacientes de reservas manuais. Os testes incluem isolamento entre unidades, controle de permissões, publicação em lote, concorrência manual/online, confirmação, cancelamento, reabertura, revogação e troca de senha.
+
+## Agendamento pelo perfil do local
+
+O botão **Agendar atendimento** no perfil do local abre `agendar-local.html?local=ID`. A tela mostra os profissionais publicados vinculados à unidade e consulta a disponibilidade de cada um com o filtro `local`. Cada cartão apresenta dias e horários selecionáveis, com valor ou indicação de consulta do valor. O paciente escolhe a vaga e continua no fluxo existente de revisão e login, preservando local, profissional e horário. A tela oferece contatos quando não há equipe ou horários e nova tentativa quando a agenda falha. A navegação de volta na confirmação retorna aos profissionais do local. Não foi necessário alterar o banco.
