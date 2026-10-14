@@ -41,6 +41,8 @@ async function requireTeam(req,res,next) {
 
 module.exports = function mountTeam(app) {
   app.use(['/api/team','/api/professional'], requireTeam);
+  require('./team-experience')(app);
+  require('./team-scheduling')(app);
   app.post(['/api/team/password','/api/professional/password'], authLimit, async (req,res,next) => {
     const b=req.body||{};
     if(typeof b.currentPassword!=='string'||b.currentPassword.length>128||typeof b.password!=='string'||b.password.length<8||b.password.length>128)return res.status(400).json({error:'Informe sua senha atual e uma nova senha de 8 a 128 caracteres.'});
@@ -68,10 +70,24 @@ module.exports = function mountTeam(app) {
       res.json({ user:{name:req.user.name,role:req.user.role},pairs,places });
     } catch (error) { next(error); }
   });
+  app.get('/api/professional/scheduled', async (req,res,next)=>{
+    try {
+      const local=req.query.local||'',page=Number(req.query.page||1);
+      if((local&&!validId(local))||!Number.isInteger(page)||page<1||page>100000)return res.status(400).json({error:'Filtros inválidos.'});
+      const access=scope(req.user);
+      const where=access.sql+" AND a.status='confirmado' AND (?='' OR d.local_id=?)";
+      const params=[...access.values,local,local];
+      const joins=' FROM agendamentos a JOIN disponibilidades d ON d.id=a.disponibilidade_id LEFT JOIN usuarios pu ON pu.id=a.paciente_id LEFT JOIN locais_atendimento l ON l.id=d.local_id ';
+      const [totals]=await pool.execute('SELECT COUNT(*) AS total,COUNT(DISTINCT DATE(d.inicio_em)) AS days,COUNT(DISTINCT d.local_id) AS places'+joins+'WHERE '+where,params);
+      const [items]=await pool.execute("SELECT a.id AS agendamento_id,a.status AS agendamento_status,COALESCE(a.nome_paciente,pu.nome_completo) AS paciente,l.nome AS local,DATE_FORMAT(d.inicio_em,'%Y-%m-%dT%H:%i:%s-03:00') AS inicio_em,DATE_FORMAT(d.fim_em,'%Y-%m-%dT%H:%i:%s-03:00') AS fim_em"+joins+'WHERE '+where+' ORDER BY d.inicio_em,a.id LIMIT 50 OFFSET '+((page-1)*50),params);
+      res.json({slots:items,summary:totals[0],page,hasMore:page*50<totals[0].total});
+    } catch(error){next(error);}
+  });
   app.get(['/api/team/agenda','/api/professional/agenda'], async (req,res,next) => {
     try {
       const start = date(String(req.query.dia || '')+'T00:00');
-      const end = new Date(+start+86400000);
+      if(req.query.periodo&&!['dia','semana'].includes(req.query.periodo))throw fail('Período inválido.',400);
+      const end = new Date(+start+(req.query.periodo==='semana'?7:1)*86400000);
       const professional = req.query.profissional || '', local = req.query.local || '';
       if ((professional&&!validId(professional)) || (local&&!validId(local))) throw fail('Filtros inválidos.',400);
       const access = scope(req.user);
@@ -109,7 +125,9 @@ module.exports = function mountTeam(app) {
       if(!validId(b.profissional_id)||!validId(b.local_id))throw fail('Selecione profissional e local.',400);
       start=date(b.inicio);end=date(b.fim);duration=Number(b.duracao);
       price=b.valor===''||b.valor==null?null:Number(b.valor);
-      if(start<=new Date()||end<=start||end-start>43200000||!Number.isInteger(duration)||duration<5||duration>240||(end-start)%(duration*60000)!==0||(end-start)/(duration*60000)>96)throw fail('Use um intervalo futuro de até 12 horas, dividido em consultas de 5 a 240 minutos, sem sobras.',400);
+      if(start<=new Date())throw fail('O início deve ser posterior ao horário atual. Você pode disponibilizar horários para hoje.',400);
+      if(end<=start||end-start>43200000||!Number.isInteger(duration)||duration<5||duration>240||end-start<duration*60000||Math.floor((end-start)/(duration*60000))>96)throw fail('Informe um intervalo de até 12 horas que comporte ao menos uma consulta completa de 5 a 240 minutos (máximo de 96 horários).',400);
+      end=new Date(+start+Math.floor((end-start)/(duration*60000))*duration*60000);
       if(price!==null&&(!Number.isFinite(price)||price<0||price>999999.99))throw fail('Informe um valor válido.',400);
     } catch(error){return res.status(error.status||400).json({error:error.message});}
     await transaction(res,next,async c=>{
@@ -162,10 +180,16 @@ module.exports = function mountTeam(app) {
         WHERE d.id=? AND ${access.sql} AND d.status='disponivel' AND d.inicio_em>NOW() AND p.ativo=1 AND u.ativo=1 AND l.ativo=1
         AND u.senha_hash<>'CONTA_DEMONSTRACAO_SEM_LOGIN' FOR UPDATE`,[b.slotId,...access.values]);
       const slot=rows[0];if(!slot)throw fail('Horário indisponível ou fora do seu acesso.');
+      if(b.waitlistId){
+        if(!validId(b.waitlistId))throw fail('Registro de espera inválido.',400);
+        const [waiting]=await c.execute("SELECT * FROM lista_espera WHERE id=? AND profissional_id=? AND local_id=? AND status<>'encerrado' FOR UPDATE",[b.waitlistId,slot.profissional_id,slot.local_id]);
+        if(!waiting.length||waiting[0].nome!==b.nome.trim()||waiting[0].telefone!==phone)throw fail('O registro da lista de espera não corresponde a este agendamento. Atualize a lista.');
+      }
       const [result]=await c.execute(`INSERT INTO agendamentos (paciente_id,profissional_id,disponibilidade_id,local_nome,local_endereco,valor,origem,nome_paciente,telefone_paciente,email_paciente)
         VALUES (NULL,?,?,?,?,?,'manual',?,?,?)`,[slot.profissional_id,slot.id,slot.local_nome,address(slot),slot.valor,b.nome.trim(),phone,b.email?.trim().toLowerCase()||null]);
       await c.execute("UPDATE disponibilidades SET status='reservado' WHERE id=?",[slot.id]);
       await audit(c,req.user,slot.id,'agendar_manual',result.insertId);
+      if(b.waitlistId)await c.execute("UPDATE lista_espera SET status='encerrado' WHERE id=?",[b.waitlistId]);
       return {id:result.insertId};
     });
   });

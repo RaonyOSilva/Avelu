@@ -57,11 +57,24 @@ test('área de atendimento: isolamento, agenda online e recepção',{timeout:400
       const publicSlots=await request('/api/professionals/'+p.insertId+'/availability');assert.equal(publicSlots.data.slots.length,2);slotA=publicSlots.data.slots[0].id;
       assert.equal((await request('/api/team/availability',{...block,local_id:places[1],inicio:day+'T07:30'},other)).status,409);
       assert.equal((await request('/api/professionals/'+p.insertId+'/availability')).data.slots.length,2);
-      assert.equal((await request('/api/team/availability',{...block,fim:day+'T08:45'},secretary)).status,400);
+      assert.equal((await request('/api/team/availability',{...block,fim:day+'T08:15'},secretary)).status,400);
       assert.equal((await request('/api/team/availability',{...block,local_id:places[1],inicio:day+'T10:00',fim:day+'T10:30'},other)).status,200);
       const list=await request('/api/team/agenda?dia='+day,null,other);assert.equal(list.data.slots.length,1);slotB=list.data.slots[0].id;
       assert.equal((await request('/api/team/agenda?dia='+day+'&local='+places[1],null,secretary)).data.slots.length,0);
       assert.equal((await request('/api/team/availability/'+slotB+'/state',{status:'bloqueado'},secretary)).status,404);
+    });
+
+    await t.test('encaixe de hoje aceita início futuro e sobra sem ultrapassar o fim',async t=>{
+      const now=new Date(),start=new Date(Math.ceil((+now+120000)/60000)*60000);
+      const localTime=d=>new Date(+d-10800000).toISOString().slice(0,16);
+      const end=new Date(+start+11*60000);
+      if(localTime(start).slice(0,10)!==localTime(end).slice(0,10)||localTime(now).slice(0,10)!==localTime(start).slice(0,10)){t.skip('Sem intervalo suficiente antes da meia-noite');return;}
+      const data={...block,inicio:localTime(start),fim:localTime(end),duracao:5};
+      const created=await request('/api/team/availability',data,secretary);
+      assert.equal(created.status,200);assert.equal(created.data.created,2);
+      const agenda=(await request('/api/team/agenda?dia='+data.inicio.slice(0,10),null,secretary)).data.slots;
+      assert.equal(agenda.length,2);assert.equal(+new Date(agenda[1].fim_em),+start+10*60000);
+      assert.equal((await request('/api/team/availability',{...data,inicio:localTime(new Date(+now-60000))},secretary)).status,400);
     });
     await t.test('recepção e paciente concorrem pela mesma vaga sem duplicar',async()=>{
       const results=await Promise.all([request('/api/team/appointments',{slotId:slotA,nome:'Paciente manual',telefone:'(33) 99999-1234'},secretary),request('/api/appointments',{slotId:slotA},patient)]);
@@ -106,6 +119,14 @@ test('área de atendimento: isolamento, agenda online e recepção',{timeout:400
       
       assert.equal((await request('/api/professional/availability',block,doctor)).status,403);
       const agenda=(await request('/api/professional/agenda?dia='+day,null,doctor)).data;
+      const overview=await request('/api/professional/scheduled',null,doctor);
+      assert.equal(overview.status,200);assert.ok(overview.data.slots.length>0);
+      assert.ok(overview.data.slots.every(s=>s.agendamento_status==='confirmado'));
+      assert.ok(overview.data.slots.every(s=>agenda.slots.some(a=>a.agendamento_id===s.agendamento_id)));
+      assert.equal(overview.data.summary.total,overview.data.slots.length);
+      assert.equal((await request('/api/professional/scheduled?page=-1',null,doctor)).status,400);
+      assert.equal((await request('/api/professional/scheduled',null,patient)).status,403);
+      assert.equal((await request('/api/professional/scheduled')).status,401);
       const confirmed=agenda.slots.find(s=>s.agendamento_status==='confirmado');
       assert.equal((await request('/api/professional/appointments/'+confirmed.agendamento_id+'/state',{status:'concluido'},doctor)).status,409);
       assert.equal((await request('/api/professional/appointments/'+confirmed.agendamento_id+'/state',{status:'confirmado'},doctor)).status,403);

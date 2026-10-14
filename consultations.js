@@ -4,7 +4,7 @@ const {currentUser}=require('./auth');
 const validId=v=>/^[1-9]\d{0,14}$/.test(String(v));
 const fail=(message,status=409)=>Object.assign(new Error(message),{status});
 async function appointment(c,id,userId,lock=false){
- const [rows]=await c.execute(`SELECT a.id,a.status,a.motivo,a.disponibilidade_id,
+ const [rows]=await c.execute(`SELECT a.id,a.paciente_id,a.profissional_id,a.status,a.motivo,a.disponibilidade_id,
  COALESCE(a.nome_paciente,patient.nome_completo) AS paciente,
  COALESCE(a.email_paciente,patient.email) AS email,
  COALESCE(a.telefone_paciente,patient.telefone) AS telefone,
@@ -30,7 +30,14 @@ module.exports=app=>{
  app.get('/api/consultations/:id',async(req,res,next)=>{
  try{if(!validId(req.params.id))throw fail('Atendimento inválido.',400);
  const data=await appointment(pool,req.params.id,req.user.id);
- res.json({appointment:data,record:await record(pool,req.params.id)});
+ let history=[];
+ if(data.paciente_id){
+ [history]=await pool.execute(`SELECT a.id,a.local_nome,DATE_FORMAT(d.inicio_em,'%Y-%m-%dT%H:%i:%s-03:00') AS inicio_em,r.evolucao,r.receita
+ FROM agendamentos a JOIN registros_atendimentos r ON r.agendamento_id=a.id JOIN disponibilidades d ON d.id=a.disponibilidade_id
+ WHERE a.paciente_id=? AND a.profissional_id=? AND a.id<>? AND a.status='concluido' AND r.finalizado_em IS NOT NULL AND d.inicio_em<? ORDER BY d.inicio_em DESC LIMIT 50`,
+ [data.paciente_id,data.profissional_id,data.id,data.inicio_em.slice(0,19).replace('T',' ')]);
+ }
+ res.json({appointment:data,record:await record(pool,req.params.id),history});
  }catch(e){if(e.status)return res.status(e.status).json({error:e.message});next(e);}
  });
  app.post('/api/consultations/:id',async(req,res,next)=>{

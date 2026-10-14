@@ -73,7 +73,7 @@ test('cart?es filtram estados, preservam a??es e permitem voltar ? agenda comple
   const rows=()=>h.elements.get('#agenda-list').children;
   const filters=h.elements.get('#filters').elements;filters.profissional.value='7';filters.local.value='8';
   const day=filters.dia.value;
-  for(const [view,label] of [['disponivel','Livre'],['agendado','A confirmar'],['confirmado','Confirmado'],['cancelled','Cancelado']]){
+  for(const [view,label] of [['disponivel','Livre'],['agendado','Aguardando confirmação'],['confirmado','Confirmado'],['cancelled','Cancelado']]){
     select(view);assert.equal(rows().length,1);assert.equal(rows()[0].children[1].children[0].textContent,label);
     assert.equal(h.tabs.find(b=>b.dataset.view===view).attributes['aria-pressed'],'true');
     assert.equal(filters.dia.value,day);assert.equal(filters.profissional.value,'7');assert.equal(filters.local.value,'8');
@@ -83,7 +83,7 @@ test('cart?es filtram estados, preservam a??es e permitem voltar ? agenda comple
     if(view==='confirmado')assert.equal(rows()[0].children[3].children[0].textContent,'Cancelar');
     if(view==='cancelled'){assert.equal(rows()[0].children[3].children.length,0);assert.equal(rows()[0].children[2].children.at(-1).textContent,'Solicita??o do paciente');}
   }
-  select('agendado');await h.elements.get('#filters').listeners.change();assert.equal(rows().length,1);assert.equal(rows()[0].children[1].children[0].textContent,'A confirmar');
+  select('agendado');await h.elements.get('#filters').listeners.change();assert.equal(rows().length,1);assert.equal(rows()[0].children[1].children[0].textContent,'Aguardando confirmação');
   select('agenda');assert.equal(rows().length,4);
 });
 test('filtro sem resultados informa o estado escolhido',async()=>{
@@ -99,4 +99,23 @@ test('profissional consulta a própria API e sai para o login da sua agenda',asy
  assert.equal(h.elements.get('#filters').elements.profissional.value,'7');
  const button=h.elements.get('#logout');await button.listeners.click({currentTarget:button});
  assert.equal(new URL(h.destination(),'http://localhost').searchParams.get('next'),'/profissional.html');
+});
+
+test('grade semanal mantém pacientes, profissionais e ações; remarcação abre busca de vagas',async()=>{
+ const h=harness({fullAgenda:true});vm.runInContext(source,h.context);
+ vm.runInContext(require('node:fs').readFileSync(require('node:path').join(__dirname,'../atendimento-extras.js'),'utf8'),h.context);
+ await settle();
+ h.elements.get('#agenda-period').value='semana';
+ await h.elements.get('#filters').listeners.change();
+ const grid=h.elements.get('#week-grid');assert.equal(grid.hidden,false);assert.equal(h.elements.get('#agenda-list').hidden,true);assert.equal(grid.children.length,7);
+ // Os registros de teste são de 2035; ao selecionar a data correta aparecem na grade.
+ h.elements.get('#filters').elements.dia.value='2035-01-20';await h.elements.get('#filters').listeners.change();
+ const firstDay=grid.children[0],table=firstDay.children[1].children[0];
+ assert.equal(table.tag,'table');
+ const tbody=table.children[1];assert.ok(tbody.children.length);
+ h.elements.get('#agenda-period').value='dia';await h.elements.get('#filters').listeners.change();
+ const reserved=h.elements.get('#agenda-list').children[1];
+ const reschedule=reserved.children[3].children.find(b=>b.textContent==='Remarcar');assert.ok(reschedule);
+ await reschedule.listeners.click();await settle();assert.equal(h.elements.get('#reschedule-dialog').open,true);
+ assert.ok(h.elements.get('#reschedule-slot').options.length>1);
 });

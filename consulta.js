@@ -1,25 +1,26 @@
 
 const $=s=>document.querySelector(s),id=new URLSearchParams(location.search).get('id');
 const node=(tag,text,cls)=>{const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;};
-let appointment,record,dirty=false,busy=false,locked=false;
+let appointment,record,dirty=false,busy=false,locked=false,autoSaving=false,autoTimer=null,saveConflict=false;
 const dateLabel=s=>new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'long',timeStyle:'short'}).format(new Date(s));
 async function api(body){
  const r=await fetch('/api/consultations/'+encodeURIComponent(id),{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(15000),...(body?{body:JSON.stringify(body)}:{})});
  const data=await r.json().catch(()=>({}));
- if(r.status===401){location.assign('entrar.html?next='+encodeURIComponent('/consulta.html?id='+id));throw Error('Entre novamente para acessar este atendimento.');}
- if(!r.ok)throw Error(data.error||'Não foi possível carregar ou salvar o atendimento.');
+ if(r.status===401){if(!body&&!dirty)location.assign('entrar.html?next='+encodeURIComponent('/consulta.html?id='+id));throw Object.assign(Error(body?'Sua sessão expirou. Entre novamente em outra aba e volte para salvar. Suas anotações permanecem nesta tela.':'Entre novamente para acessar este atendimento.'),{status:401});}
+ if(!r.ok)throw Object.assign(Error(data.error||'Não foi possível carregar ou salvar o atendimento.'),{status:r.status});
  return data;
 }
 function controls(){
  ['#save','#finish','#print-all','#print-prescription','#finish-confirm','#finish-back'].forEach(s=>$(s).disabled=busy);
- $('#evolution').readOnly=$('#prescription').readOnly=locked||busy;
+ $('#evolution').readOnly=$('#prescription').readOnly=locked||(busy&&!autoSaving);
  $('#save').hidden=$('#finish').hidden=locked;
 }
 async function load(){
  $('#retry').hidden=true;
  try{
  if(!/^[1-9]\d{0,14}$/.test(id||''))throw Error('Escolha um atendimento na sua agenda.');
- const data=await api();appointment=data.appointment;record=data.record;
+ if(dirty){$('#message').textContent='Há anotações não salvas. Salve antes de recarregar.';return;}
+ const data=await api();appointment=data.appointment;record=data.record;renderHistory(data.history||[]);
  locked=appointment.status==='concluido'||!!record.finalizado_em;
  $('#patient-name').textContent=appointment.paciente||'Paciente';
  $('#appointment-context').textContent=dateLabel(appointment.inicio_em)+' · '+(appointment.local||'Local não informado');
@@ -30,16 +31,18 @@ async function load(){
  $('#save-status').textContent=record.versao?'Registro salvo.':'Nenhuma anotação salva ainda.';controls();
  }catch(e){$('#message').textContent=e.message;$('#retry').hidden=false;}
 }
-async function save(finalizar=false){
+async function save(finalizar=false,automatic=false){
  if(busy)return false;if(locked)return true;
- busy=true;controls();$('#message').textContent='Salvando registro…';
+ let savedOk=false;clearTimeout(autoTimer);autoSaving=automatic;
+ const snapshot={evolucao:$('#evolution').value,receita:$('#prescription').value};
+ busy=true;controls();$('#save-status').textContent='Salvando…';if(!automatic)$('#message').textContent='Salvando registro…';
  try{
- const data=await api({evolucao:$('#evolution').value,receita:$('#prescription').value,versao:record.versao,finalizar});
- record=data.record;appointment.status=data.status;dirty=false;locked=data.status==='concluido';
- $('#save-status').textContent='Todas as alterações foram salvas.';
+ const data=await api({...snapshot,versao:record.versao,finalizar});
+ savedOk=true;record=data.record;appointment.status=data.status;dirty=$('#evolution').value!==snapshot.evolucao||$('#prescription').value!==snapshot.receita;saveConflict=false;locked=data.status==='concluido';
+ $('#save-status').textContent=dirty?'Há alterações novas para salvar.':'Salvo às '+new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date());
  $('#message').textContent=locked?'Atendimento finalizado. Você pode imprimir os documentos.':'Rascunho salvo.';
  return true;
- }catch(e){$('#message').textContent=e.message;return false;}finally{busy=false;controls();}
+ }catch(e){saveConflict=[401,403,409].includes(e.status);$('#message').textContent=e.message;$('#save-status').textContent='Não foi possível salvar. Seu texto permanece nesta tela.';return false;}finally{busy=false;autoSaving=false;controls();if(dirty&&!saveConflict&&!locked&&automatic)scheduleAutosave(savedOk?1800:15000);}
 }
 function printPage(title,text){
  const section=node('section','','print-page');section.append(node('h1',title));
@@ -63,7 +66,9 @@ async function printRecord(mode){
  if(mode==='prescription'||record.receita.trim())document.append(printPage('Receita',record.receita));
  window.print();
 }
-$('#record-form').addEventListener('input',()=>{dirty=true;$('#save-status').textContent='Alterações ainda não salvas.';$('#print-document').replaceChildren();});
+function scheduleAutosave(delay=1800){clearTimeout(autoTimer);if(dirty&&!locked&&!saveConflict)autoTimer=setTimeout(()=>{if(busy)scheduleAutosave();else save(false,true);},delay);}
+function changed(){dirty=true;$('#save-status').textContent='Alterações ainda não salvas.';$('#print-document').replaceChildren();scheduleAutosave();}
+$('#record-form').addEventListener('input',changed);
 $('#record-form').addEventListener('submit',e=>{e.preventDefault();save();});
 $('#finish').addEventListener('click',()=>{if(!$('#evolution').value.trim()){$('#message').textContent='Registre a evolução antes de finalizar.';$('#evolution').focus();return;}$('#finish-dialog').showModal();});
 $('#finish-back').addEventListener('click',()=>$('#finish-dialog').close());
@@ -73,3 +78,9 @@ $('#print-all').addEventListener('click',()=>printRecord('all'));$('#print-presc
 $('#retry').addEventListener('click',load);
 window.addEventListener('beforeunload',e=>{if(dirty||busy){e.preventDefault();e.returnValue='';}});
 load();
+
+function renderHistory(history){
+ const list=$('#history-list');list.replaceChildren();
+ if(!history.length){list.append(node('p',appointment.paciente_id?'Nenhum registro anterior finalizado por você para este paciente.':'Este agendamento manual não está vinculado a uma conta de paciente. O histórico não é associado por nome ou telefone.'));return;}
+ for(const entry of history){const details=node('details','','history-entry');details.append(node('summary',dateLabel(entry.inicio_em)+' · '+(entry.local_nome||'')),node('h3','Evolução'),node('p',entry.evolucao,'clinical-text'),node('h3','Receita'),node('p',entry.receita||'Não registrada.','clinical-text'));list.append(details);}
+}

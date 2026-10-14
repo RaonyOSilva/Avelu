@@ -5,7 +5,7 @@ function safeNext(value) {
   if (!value) return '/agendamentos.html';
   try {
     const url = new URL(value, location.origin);
-    if (url.origin === location.origin && ['/agendar.html', '/agendamentos.html', '/admin.html', '/agenda-admin.html', '/consulta.html', '/profissional.html', '/atendimento.html', '/equipe.html'].includes(url.pathname)) return url.pathname + url.search;
+    if (url.origin === location.origin && ['/agendar.html', '/agendamentos.html', '/admin.html', '/agenda-admin.html', '/consulta.html', '/profissional.html', '/programacao.html', '/atendimento.html', '/equipe.html'].includes(url.pathname)) return url.pathname + url.search;
   } catch { /* Use o destino padrão para URLs inválidas. */ }
   return '/agendamentos.html';
 }
@@ -89,11 +89,17 @@ if(page==='booking'){
 if(page==='appointments'){
  let booked;try{booked=sessionStorage.getItem('avelu-booked');sessionStorage.removeItem('avelu-booked');}catch{}
  const list=document.querySelector('#appointments'),dialog=document.querySelector('#cancel-dialog');let cancelId=null;
- const statusLabels={agendado:'Agendado',confirmado:'Confirmado',concluido:'Concluído',cancelado:'Cancelado'};
- async function loadAppointments(){document.querySelector('#loading').hidden=false;document.querySelector('#retry-appointments').hidden=true;
+ const statusLabels={agendado:'Aguardando confirmação da equipe',confirmado:'Confirmado',concluido:'Atendimento realizado',cancelado:'Cancelado'};
+ async function loadAppointments(silent=false){if(silent&&(document.hidden||dialog.open||document.activeElement?.closest('form,button,a')))return;if(!silent)document.querySelector('#loading').hidden=false;document.querySelector('#retry-appointments').hidden=true;
   try{const appointments=await api('/api/appointments');list.replaceChildren();appointments.sort((a,b)=>{const active=x=>['agendado','confirmado'].includes(x.status)&&new Date(x.inicio_em)>new Date();return Number(active(b))-Number(active(a))||(active(a)?new Date(a.inicio_em)-new Date(b.inicio_em):new Date(b.inicio_em)-new Date(a.inicio_em));});
    if(!appointments.length)list.append(node('p','Você ainda não tem agendamentos. Encontre um profissional e escolha seu primeiro horário.','muted'));
-   for(const a of appointments){const card=node('article','','appointment-item');card.id='agendamento-'+a.id;card.append(node('span',statusLabels[a.status]||a.status,'status-pill'),node('h2',a.name),node('p',a.specialty,'muted'),node('p',dateLabel(a.inicio_em)),node('strong',a.local_nome||'Local ainda não informado'),node('p',a.local_endereco||'Confirme o endereço com o profissional.'),node('p',priceLabel(a.valor)));if(['agendado','confirmado'].includes(a.status)&&new Date(a.inicio_em)>new Date()){const actions=node('div','','booking-actions');const change=node('a','Remarcar','btn btn-light');change.href='agendar.html?profissional='+a.profissional_id+'&remarcar='+a.id;const cancel=action('Cancelar',()=>{cancelId=a.id;document.querySelector('#cancel-detail').textContent=a.name+' · '+dateLabel(a.inicio_em);document.querySelector('#cancel-message').textContent='';dialog.showModal();});actions.append(change,cancel);card.append(actions);}list.append(card);}
+   let nextShown=false;for(const a of appointments){const card=node('article','','appointment-item');card.id='agendamento-'+a.id;
+ const future=new Date(a.inicio_em)>new Date(),active=['agendado','confirmado'].includes(a.status);
+ if(active&&future&&!nextShown){card.className+=' next-appointment';card.append(node('span','Seu próximo atendimento','eyebrow'));nextShown=true;}
+ card.append(node('span',statusLabels[a.status]||a.status,'status-pill'),node('h2',a.name),node('p',a.specialty,'muted'),node('p',dateLabel(a.inicio_em)),node('strong',a.local_nome||'Local ainda não informado'),node('p',a.local_endereco||'Confirme o endereço com o profissional.'),node('p',priceLabel(a.valor)));
+ card.append(node('p',a.status==='agendado'?'Seu horário está reservado e aguarda confirmação da equipe. Acompanhe a atualização nesta página.':a.status==='confirmado'?'Sua consulta está confirmada. Confira o endereço e compareça no horário agendado.':a.status==='cancelado'?'Este agendamento foi cancelado. Você pode escolher outro horário.':'Atendimento concluído.','appointment-guidance'));
+ if(active&&!future)card.append(node('p','O horário agendado já passou. Para alterações, procure a equipe do local.','muted'));
+ if(['agendado','confirmado'].includes(a.status)&&new Date(a.inicio_em)>new Date()){const actions=node('div','','booking-actions');const change=node('a','Remarcar','btn btn-light');change.href='agendar.html?profissional='+a.profissional_id+'&remarcar='+a.id;const cancel=action('Cancelar',()=>{cancelId=a.id;document.querySelector('#cancel-detail').textContent=a.name+' · '+dateLabel(a.inicio_em);document.querySelector('#cancel-message').textContent='';dialog.showModal();});actions.append(change,cancel);card.append(actions);}list.append(card);}
    if(booked){document.querySelector('#booking-success').hidden=false;const card=document.querySelector('#agendamento-'+booked);if(card){card.classList.add('appointment-selected');card.tabIndex=-1;card.focus();}booked=null;}
   }catch(error){if(error.status===401)return loginFor('/agendamentos.html');message.textContent=error.message;document.querySelector('#retry-appointments').hidden=false;}finally{document.querySelector('#loading').hidden=true;}}
  document.querySelector('#retry-appointments').addEventListener('click',()=>{message.textContent='';loadAppointments();});
@@ -103,5 +109,6 @@ if(page==='appointments'){
  async function loadAccount(){try{const data=await api('/api/account');profile.elements.name.value=data.name;profile.elements.phone.value=data.phone||'';profile.elements.email.value=data.email;profile.hidden=false;}catch(error){if(error.status===401)return loginFor('/agendamentos.html');document.querySelector('#account-message').textContent=error.message;}}
  profile.addEventListener('submit',async event=>{event.preventDefault();const button=profile.querySelector('button');button.disabled=true;try{await api('/api/account',{method:'POST',body:JSON.stringify({name:profile.elements.name.value,phone:profile.elements.phone.value})});document.querySelector('#account-message').textContent='Dados atualizados.';}catch(error){document.querySelector('#account-message').textContent=error.message;}finally{button.disabled=false;}});
  document.querySelector('#logout').addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{await api('/api/auth/logout',{method:'POST'});location.assign('/index.html');}catch(error){message.textContent=error.message;button.disabled=false;}});
+ if(typeof window!=='undefined'&&window.setInterval)window.setInterval(()=>loadAppointments(true),30000);
  loadAppointments();loadAccount();
 }

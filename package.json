@@ -17,7 +17,10 @@
     "db:migrate:pt": "node scripts/migrate-to-portuguese.js",
     "db:setup:journey": "node scripts/setup-journey.js",
     "db:setup:team": "node scripts/setup-team.js",
-    "db:setup:consultations": "node scripts/setup-consultations.js"
+    "db:setup:consultations": "node scripts/setup-consultations.js",
+    "db:setup:experience": "node scripts/setup-experience.js",
+    "db:setup:scheduling": "node scripts/setup-scheduling.js",
+    "schedule:run": "node scripts/run-scheduling.js"
   },
   "engines": {
     "node": ">=20"

@@ -5,6 +5,7 @@ const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',ye
 const hour=s=>new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit'}).format(new Date(s));
 const dayLabel=s=>new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'long'}).format(new Date(s+'T12:00:00-03:00'));
 const login='entrar.html?next=%2Fprofissional.html';
+let mode='day',allPage=1;
 let slots=[],cancelled=[],view='confirmado',version=0,selected=null,ready=false;
 $('#day').value=today();
 async function api(url,body){
@@ -31,9 +32,11 @@ function render(){
  $('#progress-note').textContent=!total?'Os atendimentos confirmados pela equipe aparecerão aqui.':!confirmed.length?'Jornada concluída. Todos os atendimentos desta seleção foram realizados.':'Acompanhe seu progresso, um paciente de cada vez.';
  document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===view)));
  const list=$('#patients');list.replaceChildren();
+ let groupDate='',groupList=list;
  const items=view==='cancelled'?cancelled:view==='concluido'?done:confirmed;
- if(!items.length){const box=node('div','','empty-agenda');box.append(node('h3',view==='confirmado'?'Nenhum atendimento confirmado':view==='concluido'?'Nenhum atendimento realizado':'Nenhum atendimento cancelado'),node('p','Para esta data e local. Você pode consultar outro dia no calendário.'));list.append(box);return;}
+ if(!items.length){const box=node('div','','empty-agenda');box.append(node('h3',view==='confirmado'?'Nenhum atendimento confirmado':view==='concluido'?'Nenhum atendimento realizado':'Nenhum atendimento cancelado'),node('p',mode==='all'?'Os atendimentos aparecerão aqui após a confirmação pela equipe.':'Para esta data e local. Você pode consultar outro dia no calendário.'));list.append(box);return;}
  items.forEach((slot,index)=>{
+ if(mode==='all'&&groupDate!==slot.inicio_em.slice(0,10)){groupDate=slot.inicio_em.slice(0,10);const group=node('section','','scheduled-day');group.append(node('h3',(groupDate===today()?'Hoje · ':'')+dayLabel(groupDate)));groupList=node('div','','scheduled-cards');group.append(groupList);list.append(group);}
  const card=node('article','','patient-card'+(view==='confirmado'&&index===0?' next-patient':''));
  const top=node('div','','patient-top');top.append(node('strong',hour(slot.inicio_em)),node('span',view==='concluido'?'✓ Realizado':view==='cancelled'?'Cancelado':index===0?'Próximo da lista':'Confirmado pela equipe','patient-badge'));
  const identity=node('div','','patient-identity');const initials=(slot.paciente||'Paciente').split(/\s+/).filter(Boolean).slice(0,2).map(n=>n[0]).join('');
@@ -48,13 +51,15 @@ function render(){
  if(perform.disabled)card.append(node('small','Disponível para realizar em qualquer horário na data agendada.'));
  }
  if(view==='concluido'){const link=node('a','Ver registro e imprimir','btn btn-light');link.href='consulta.html?id='+slot.agendamento_id;card.append(link);}
- list.append(card);
+ groupList.append(card);
  });
 }
-async function load(){
+async function load(silent=false){
+ silent=silent===true;
+ if(silent&&(document.hidden||!ready||document.querySelector('dialog[open]')||document.activeElement?.closest('form,button,a')||$('#patients').getAttribute('aria-busy')==='true'))return;
  if(!$('#filters').reportValidity())return;
- const current=++version;$('#patients').replaceChildren();$('#patients').setAttribute('aria-busy','true');$('#message').textContent='Buscando seus atendimentos…';$('#retry').hidden=true;
- try{const data=await api('/api/professional/agenda?'+new URLSearchParams({dia:$('#day').value,local:$('#place').value}));if(current!==version)return;slots=data.slots;cancelled=data.cancelled;render();$('#message').textContent=data.truncated?'Há mais resultados. Selecione um local para refinar a consulta.':'';}
+ const current=++version;if(!silent)$('#patients').replaceChildren();$('#patients').setAttribute('aria-busy','true');if(!silent)$('#message').textContent='Buscando seus atendimentos…';$('#retry').hidden=true;
+ try{const data=await api(mode==='all'?'/api/professional/scheduled?'+new URLSearchParams({local:$('#place').value,page:allPage}):'/api/professional/agenda?'+new URLSearchParams({dia:$('#day').value,local:$('#place').value}));if(current!==version)return;slots=data.slots;cancelled=data.cancelled||[];render();if(mode==='all'){const summary=$('#all-summary');summary.replaceChildren();for(const [value,label] of [[data.summary.total,'atendimentos confirmados'],[data.summary.days,'dias com pacientes'],[data.summary.places,'locais de atendimento']]){const box=node('div');box.append(node('strong',value),node('span',label));summary.append(box);}$('#all-previous').disabled=allPage===1;$('#all-next').disabled=!data.hasMore;$('#all-page').textContent='Página '+allPage+' · por data e horário';}if($('#sync-status'))$('#sync-status').textContent='Atualizado às '+hour(new Date())+' · atualização automática a cada 30 s';$('#message').textContent=data.truncated?'Há mais resultados. Selecione um local para refinar a consulta.':'';}
  catch(e){if(current!==version)return;$('#message').textContent=e.message;$('#retry').hidden=false;}
  finally{if(current===version)$('#patients').setAttribute('aria-busy','false');}
 }
@@ -65,7 +70,7 @@ async function initialize(){
  $('#workspace').hidden=false;$('#password-open').hidden=false;await load();
  }catch(e){$('#message').textContent=e.message;$('#retry').hidden=false;}
 }
-$('#filters').addEventListener('submit',e=>{e.preventDefault();load();});$('#filters').addEventListener('change',load);
+$('#filters').addEventListener('submit',e=>{e.preventDefault();load();});$('#filters').addEventListener('change',()=>{allPage=1;load();});
 function move(delta){const date=new Date($('#day').value+'T12:00:00Z');if(!Number.isFinite(+date))return;date.setUTCDate(date.getUTCDate()+delta);$('#day').value=date.toISOString().slice(0,10);load();}
 $('#previous').addEventListener('click',()=>move(-1));$('#next').addEventListener('click',()=>move(1));$('#today').addEventListener('click',()=>{$('#day').value=today();load();});
 $('#retry').addEventListener('click',()=>ready?load():initialize());
@@ -79,4 +84,14 @@ $('#logout').addEventListener('click',async()=>{try{await api('/api/auth/logout'
 $('#password-open').addEventListener('click',()=>{$('#password-form').reset();$('#password-message').textContent='';$('#password-dialog').showModal();});
 $('#password-form').addEventListener('submit',async e=>{e.preventDefault();const b=e.currentTarget.querySelector('[type=submit]');b.disabled=true;try{await api('/api/professional/password',Object.fromEntries(new FormData(e.currentTarget)));location.replace(login);}catch(error){$('#password-message').textContent=error.message;}finally{b.disabled=false;}});
 document.querySelectorAll('dialog').forEach(d=>{d.addEventListener('cancel',e=>{if(d.dataset.busy==='true')e.preventDefault();});d.querySelector('[data-close]').addEventListener('click',()=>{if(d.dataset.busy!=='true')d.close();});});
+if(typeof window!=='undefined'&&window.setInterval)window.setInterval(()=>load(true),30000);
+document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>{
+ mode=b.dataset.mode;view='confirmado';allPage=1;
+ document.querySelectorAll('[data-mode]').forEach(t=>t.setAttribute('aria-pressed',String(t.dataset.mode===mode)));
+ $('#filters').className=mode==='all'?'all-filters':'';$('#day').parentElement.hidden=mode==='all';$('.day-navigation').hidden=mode==='all';$('.journey').hidden=mode==='all';$('.agenda-heading .view-tabs').hidden=mode==='all';
+ $('#all-summary').hidden=mode!=='all';$('#all-pagination').hidden=mode!=='all';$('#patients').className=mode==='all'?'all-scheduled':'';
+ load();
+}));
+$('#all-previous').addEventListener('click',()=>{if(allPage>1){allPage--;load();}});
+$('#all-next').addEventListener('click',()=>{allPage++;load();});
 initialize();

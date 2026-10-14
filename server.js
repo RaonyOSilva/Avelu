@@ -25,7 +25,7 @@ app.use('/api', (request, response, next) => {
   next();
 });
 // Sirva apenas arquivos públicos: código do servidor e SQL ficam privados.
-const publicFiles = new Set(['consulta.html','consulta.js','consulta.css','profissional.html','profissional.js','profissional.css','agendar-local.html', 'agendar-local.js', 'agendar-local.css', 'atendimento.html', 'atendimento.js', 'atendimento.css', 'equipe.html', 'equipe.js', 'recuperar.html', 'recuperar.js', 'agenda-admin.html', 'agenda-admin.js', 'index.html', 'sobre.html', 'buscar.html', 'buscar.js', 'buscar.css', 'perfil.html', 'perfil.js', 'perfil.css', 'cadastro.html', 'entrar.html', 'agendar.html', 'agendamentos.html', 'admin.html', 'admin-ui.js', 'admin.css', 'paginas.css', 'conta.css', 'app.js', 'conta.js', 'service-worker.js', 'manifest.webmanifest']);
+const publicFiles = new Set(['programacao.html','programacao.js','programacao.css','consulta-modelos.js','atendimento-extras.js','consulta.html','consulta.js','consulta.css','profissional.html','profissional.js','profissional.css','agendar-local.html', 'agendar-local.js', 'agendar-local.css', 'atendimento.html', 'atendimento.js', 'atendimento.css', 'equipe.html', 'equipe.js', 'recuperar.html', 'recuperar.js', 'agenda-admin.html', 'agenda-admin.js', 'index.html', 'sobre.html', 'buscar.html', 'buscar.js', 'buscar.css', 'perfil.html', 'perfil.js', 'perfil.css', 'cadastro.html', 'entrar.html', 'agendar.html', 'agendamentos.html', 'admin.html', 'admin-ui.js', 'admin.css', 'paginas.css', 'conta.css', 'app.js', 'conta.js', 'service-worker.js', 'manifest.webmanifest']);
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use((request, response, next) => {
   const file = request.path === '/' ? 'index.html' : request.path.slice(1);
@@ -41,6 +41,7 @@ mountProfiles(app);
 require('./team-access')(app);
 require('./team')(app);
 require('./consultations')(app);
+require('./clinical-templates')(app);
 
 app.get('/api/health', async (_request, response, next) => {
   try {
@@ -110,7 +111,10 @@ const server = app.listen(port, () => {
   console.log(`Avelu disponível em http://localhost:${server.address().port}`);
 });
 
+const stopScheduling=process.env.NODE_ENV!=='test'&&port!==0?require('./schedule-service').startWorker():()=>{};
+
 async function shutdown() {
+  stopScheduling();
   server.close(async () => {
     await pool.end();
     process.exit(0);

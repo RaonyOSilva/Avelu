@@ -118,3 +118,26 @@ A impressão oferece registro completo ou somente receita, com identificação e
 Não implementa assinatura digital nem modelos especiais de receituário.
 Instalações existentes: execute `npm run db:setup:consultations`.
 A API restringe os registros ao profissional titular, valida o horário e evita sobrescrita por abas concorrentes.
+
+
+### Experiência de pacientes, equipe e profissionais
+- Execute `npm run db:setup:experience` em instalações existentes para criar modelos pessoais e lista de espera.
+- Recepção: lista compacta, grade por profissional, janela de 7 dias, atualização a cada 30 segundos e remarcação para vaga do mesmo profissional. A remarcação mantém a identidade do agendamento, registra origem/destino e volta a aguardar confirmação; registros clínicos iniciados não são remarcados.
+- Lista de espera: cadastre nome, telefone, profissional, local e preferências; registre contato e use **Buscar vaga**. Ao salvar a reserva correspondente, a espera é encerrada na mesma transação. Mensagens não são enviadas automaticamente.
+- Paciente: próximo atendimento destacado e orientação conforme o status, com remarcação/cancelamento para horários futuros.
+- Profissional: rascunho salvo após uma pausa na digitação; novas edições feitas durante o envio são preservadas. Falhas mantêm o texto na tela, conflitos interrompem tentativas automáticas e não substituem registros de outra aba.
+- Histórico: até 50 registros anteriores finalizados pelo próprio profissional para o mesmo paciente identificado. Agendamentos manuais sem paciente vinculado não são associados por nome ou telefone.
+- Modelos pessoais de evolução/receita: crie, exclua ou insira ao final do campo, revisando o conteúdo para o paciente atual.
+- A atualização automática das agendas é pausada durante formulários, diálogos ou interação com controles, sem atualizar o editor clínico.
+
+### Publicação de agendas por período
+Acesse **Área de atendimento → Publicar por período** (`programacao.html`). Escolha profissional e local, intervalo de até 366 dias, dias da semana, até quatro turnos, duração e valor. Cadastre férias e exceções, revise o calendário e gere a prévia antes de confirmar. Conflitos do profissional em qualquer unidade são ignorados e apresentados na prévia; horários passados não são publicados. Sobras menores que uma consulta não geram vagas.
+
+- **Período inteiro:** publica todas as vagas elegíveis de uma vez.
+- **Janela móvel:** publica inicialmente os próximos 30, 60, 90 ou 180 dias e avança até o final do período configurado. O servidor processa as programações ao iniciar e a cada 15 minutos; precisa permanecer em execução. Alternativamente, execute `npm run schedule:run` em um agendador externo. Pausar interrompe futuras liberações, sem retirar vagas existentes.
+- **Retirar horários livres:** bloqueia somente vagas futuras livres daquela programação no intervalo escolhido, preserva reservas e registra a exceção para impedir novas liberações nesse período.
+- Instalações existentes: `npm run db:setup:scheduling`. O setup completo também inclui essas tabelas.
+
+O calendário sugere feriados nacionais e datas móveis. Pontos facultativos são opcionais. As datas municipais de Governador Valadares estão verificadas apenas para 2026, conforme o [Decreto municipal 12.413](https://invista.valadares.mg.gov.br/abrir_arquivo.aspx?arquivo=%7B8DADEA0A-7DAE-CECE-EBAA-DEEC40A62ECE%7D.pdf&cdLocal=12). Para outros anos ou cidades, revise e acrescente feriados estaduais/municipais; a tela avisa quando não há calendário regional verificado. A confirmação dessa revisão é obrigatória.
+
+Na área do profissional, **Todos atendimentos agendados** lista exclusivamente os seus agendamentos com status confirmado, de todas as datas, agrupados por dia e ordenados por horário. Há filtro por local, resumo de atendimentos/dias/locais e paginação de 50 registros. Confirmações pendentes, cancelados e realizados não aparecem nessa visão. A execução do atendimento continua restrita à data agendada.

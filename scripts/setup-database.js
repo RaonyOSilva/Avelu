@@ -26,6 +26,8 @@ async function main() {
     await require('./setup-journey').setupJourney(connection);
     await require('./setup-team').setupTeam(connection);
     await require('./setup-consultations').setupConsultations(connection);
+    await require('./setup-experience').setupExperience(connection);
+    await require('./setup-scheduling').setupScheduling(connection);
     console.log('Banco Avelu criado e dados iniciais inseridos.');
   } finally {
     await connection.end();

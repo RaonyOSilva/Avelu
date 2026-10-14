@@ -10,3 +10,6 @@
  .print-identity{border-bottom:1px solid #aaa;padding-bottom:12pt}
  .print-signature{margin-top:36pt;padding-top:10pt;border-top:1px solid #555;break-inside:avoid}
 }
+
+.history-panel,.template-panel{margin-bottom:20px}.history-panel>summary{font-weight:700;cursor:pointer}.clinical-text{white-space:pre-wrap;overflow-wrap:anywhere}.history-entry{padding:16px 0;border-bottom:1px solid #dce8e1}.template-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.template-tools select{padding:12px;max-width:100%}.record-actions{position:sticky;bottom:0;z-index:5;background:#f5f9f7;border-top:1px solid #dce8e1;padding:16px;box-shadow:0 -5px 18px #07382f0a}.patient-summary{position:sticky;top:0;z-index:4;padding:16px 24px;box-shadow:0 4px 12px #07382f08}.patient-summary h2{font-size:22px}.patient-summary dl{font-size:13px}#template-text{width:100%;padding:12px;font:inherit}
+@media(max-width:800px){.patient-summary{position:static}.record-actions{bottom:0}.template-tools{align-items:stretch;flex-direction:column}}
