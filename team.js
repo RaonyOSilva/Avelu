@@ -95,7 +95,7 @@ module.exports = function mountTeam(app) {
         DATE_FORMAT(d.inicio_em,'%Y-%m-%dT%H:%i:%s-03:00') AS inicio_em,
         DATE_FORMAT(d.fim_em,'%Y-%m-%dT%H:%i:%s-03:00') AS fim_em,d.status,d.valor,
         u.nome_completo AS profissional,l.nome AS local,p.ativo AND u.ativo AND l.ativo AS publicado,
-        a.id AS agendamento_id,a.status AS agendamento_status,a.origem,
+        a.id AS agendamento_id,a.status AS agendamento_status,a.origem,a.local_endereco,
         COALESCE(a.nome_paciente,pu.nome_completo) AS paciente,
         COALESCE(a.telefone_paciente,pu.telefone) AS telefone,
         COALESCE(a.email_paciente,pu.email) AS email
@@ -115,7 +115,7 @@ module.exports = function mountTeam(app) {
         WHERE ${access.sql} AND a.status='cancelado' AND d.inicio_em>=? AND d.inicio_em<?
           AND (?='' OR d.profissional_id=?) AND (?='' OR d.local_id=?) ORDER BY d.inicio_em LIMIT 1001`,
       [...access.values,sqlDate(start),sqlDate(end),professional,professional,local,local]);
-      res.json({ slots:rows.slice(0,1000),cancelled:cancelled.slice(0,1000),truncated:rows.length>1000||cancelled.length>1000 });
+      res.json({ slots:rows.slice(0,1000).map(row=>({...row,...(!req.user.ownProfessionalId?{whatsapp:require('./whatsapp-confirmation').confirmation(row)}:{})})),cancelled:cancelled.slice(0,1000),truncated:rows.length>1000||cancelled.length>1000 });
     } catch (error) { if(error.status)return res.status(error.status).json({error:error.message});next(error); }
   });
   app.post(['/api/team/availability','/api/professional/availability'], async (req,res,next) => {

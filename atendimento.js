@@ -68,6 +68,10 @@ function render(){
     if(view!=='cancelled'){
       if(slot.status==='disponivel'&&future){actions.append(button('Agendar paciente',()=>openManual(slot),true),button('Bloquear',()=>openAction(slot,'bloqueado')));}
       if(slot.status==='bloqueado'&&future)actions.append(button('Reabrir horário',()=>openAction(slot,'disponivel')));
+      if(slot.agendamento_status==='confirmado'&&slot.whatsapp){
+        if(slot.whatsapp.url){const link=node('a','Enviar confirmação pelo WhatsApp','btn btn-light');link.href=slot.whatsapp.url;link.target='_blank';link.rel='noopener noreferrer';link.title='Abre a mensagem pronta. Clique em Enviar no WhatsApp para concluir.';actions.append(link);actions.append(node('small','Envio manual: conclua no WhatsApp.'));}
+        else actions.append(node('small',slot.whatsapp.error));
+      }
       if(slot.agendamento_status==='agendado')actions.append(button('Confirmar',()=>openAction(slot,'confirmado'),true));
       if(['agendado','confirmado'].includes(slot.agendamento_status)){if(!future)actions.append(button('Concluir',()=>openAction(slot,'concluido')));actions.append(button('Cancelar',()=>openAction(slot,'cancelado')));if(typeof openReschedule==='function')actions.append(button('Remarcar',()=>openReschedule(slot)));}
     }
@@ -117,7 +121,7 @@ async function submit(form,message,work){
 }
 publish.addEventListener('submit',event=>{event.preventDefault();submit(publish,'#publish-message',async()=>{const b=Object.fromEntries(new FormData(publish));await api('/api/team/availability',{...b,inicio:b.dia+'T'+b.inicio,fim:b.dia+'T'+b.fim});filters.elements.dia.value=b.dia;filters.elements.profissional.value=b.profissional_id;filters.elements.local.value=b.local_id;view='agenda';});});
 manual.addEventListener('submit',event=>{event.preventDefault();submit(manual,'#manual-message',()=>api('/api/team/appointments',{...Object.fromEntries(new FormData(manual)),slotId:selectedSlot.id,...(typeof waitingBookingId==='function'?waitingBookingId():{})}).then(data=>{if(typeof waitingPatient!=='undefined'&&waitingPatient){waitingPatient=null;$('#access-status').textContent='Agendamento salvo. Confira a confirmação com o paciente.';}return data;}));});
-actionForm.addEventListener('submit',event=>{event.preventDefault();submit(actionForm,'#action-message',()=>{const {slot,type}=selectedAction;return ['bloqueado','disponivel'].includes(type)?api('/api/team/availability/'+slot.id+'/state',{status:type}):api('/api/team/appointments/'+slot.agendamento_id+'/state',{status:type,motivo:actionForm.elements.motivo.value,liberar:actionForm.elements.liberar.checked});});});
+actionForm.addEventListener('submit',event=>{event.preventDefault();submit(actionForm,'#action-message',()=>{const {slot,type}=selectedAction;return ['bloqueado','disponivel'].includes(type)?api('/api/team/availability/'+slot.id+'/state',{status:type}):api('/api/team/appointments/'+slot.agendamento_id+'/state',{status:type,motivo:actionForm.elements.motivo.value,liberar:actionForm.elements.liberar.checked}).then(data=>{if(type==='confirmado')view='confirmado';return data;});});});
 document.querySelectorAll('dialog').forEach(dialog=>{dialog.addEventListener('cancel',e=>{if(dialog.dataset.busy==='true')e.preventDefault();});dialog.querySelector('[data-close]').addEventListener('click',()=>dialog.close());});
 filters.addEventListener('submit',event=>{event.preventDefault();loadAgenda();});filters.addEventListener('change',loadAgenda);
 function moveDay(delta){const d=new Date(filters.elements.dia.value+'T12:00:00Z');if(!Number.isFinite(+d))return;d.setUTCDate(d.getUTCDate()+delta);filters.elements.dia.value=d.toISOString().slice(0,10);loadAgenda();}
