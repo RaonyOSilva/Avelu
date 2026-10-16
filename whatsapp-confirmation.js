@@ -10,4 +10,12 @@ function confirmation(slot){
  const message=`Olá ${slot.paciente}! Informamos que seu atendimento para o dia ${day}, no horário ${hour}, com o profissional ${slot.profissional}, no endereço ${slot.local_endereco}, foi confirmado. Aguardamos você, e em caso de dúvidas, cancelamento ou necessidade de remarcação, gentileza nos informar antes da data prevista.`;
  return {url:'https://wa.me/'+phone+'?text='+encodeURIComponent(message)};
 }
-module.exports={confirmation};
+function communication(slot){
+ if(slot.agendamento_status==='confirmado')return confirmation(slot);
+ if(!['cancelado','agendado'].includes(slot.agendamento_status))return null;
+ const base=confirmation({...slot,agendamento_status:'confirmado'});if(!base?.url)return base;
+ const link=new URL(base.url);const when=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'short',timeStyle:'short'}).format(new Date(slot.inicio_em));
+ link.searchParams.set('text',slot.agendamento_status==='cancelado'?`Olá ${slot.paciente}! Informamos que seu atendimento com ${slot.profissional}, em ${when}, foi cancelado. Entre em contato para verificar uma nova data.`:`Olá ${slot.paciente}! Seu atendimento com ${slot.profissional} está previsto para ${when}, em ${slot.local_endereco}, e aguarda confirmação da equipe. Em caso de dúvidas ou necessidade de remarcação, entre em contato.`);
+ return {url:link.href};
+}
+module.exports={confirmation,communication};

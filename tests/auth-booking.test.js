@@ -117,6 +117,29 @@ test('cadastro, sessão e agendamento com MySQL', { timeout: 30000 }, async t =>
       const account=await request('/api/account',undefined,firstCookie);assert.equal(account.data.name,'Paciente atualizado');assert.equal(account.data.email,email);
       assert.equal((await request('/api/auth/me',undefined,firstCookie)).data.user.role,'paciente');
     });
+
+    await t.test('patient record requires ownership and finalization',async()=>{
+      const [rows]=await pool.execute('SELECT a.id,a.status,a.paciente_id FROM agendamentos a WHERE a.profissional_id=? LIMIT 1',[profileId]);
+      const a=rows[0];assert.ok(a);
+      const [users]=await pool.execute('SELECT email FROM usuarios WHERE id=?',[a.paciente_id]);
+      const cookie=users[0].email===email?firstCookie:secondCookie;
+      const other=cookie===firstCookie?secondCookie:firstCookie;
+      await pool.execute("INSERT INTO registros_atendimentos(agendamento_id,evolucao,receita) VALUES (?,'Private test record','Test prescription')",[a.id]);
+      try{
+        const route='/api/appointments/'+a.id+'/record';
+        assert.equal((await request(route)).status,401);
+        assert.equal((await request(route,undefined,cookie)).status,404);
+        await pool.execute("UPDATE agendamentos SET status='concluido' WHERE id=?",[a.id]);
+        await pool.execute('UPDATE registros_atendimentos SET finalizado_em=NOW() WHERE agendamento_id=?',[a.id]);
+        assert.equal((await request(route,undefined,other)).status,404);
+        const result=await request(route,undefined,cookie);
+        assert.equal(result.status,200);assert.equal(result.data.evolucao,'Private test record');
+        assert.equal(result.headers.get('cache-control'),'no-store');
+      }finally{
+        await pool.execute('DELETE FROM registros_atendimentos WHERE agendamento_id=?',[a.id]);
+        await pool.execute('UPDATE agendamentos SET status=? WHERE id=?',[a.status,a.id]);
+      }
+    });
     await t.test('sessão expirada e logout bloqueiam acesso', async () => {
       const hash = createHash('sha256').update(secondCookie.split('=')[1]).digest('hex');
       await pool.execute('UPDATE sessoes SET expira_em = NOW() - INTERVAL 1 MINUTE WHERE token_hash = ?', [hash]);
@@ -153,7 +176,7 @@ test('cadastro, sessão e agendamento com MySQL', { timeout: 30000 }, async t =>
     if (child) { const stopped = new Promise(resolve => child.once('exit', resolve)); child.kill(); await stopped; }
     if (profileId) await pool.execute('DELETE FROM agendamentos WHERE profissional_id = ?', [profileId]);
     if (profileId) await pool.execute('DELETE FROM perfis_profissionais WHERE id = ?', [profileId]);
-    if(placeId)await pool.execute('DELETE FROM locais_atendimento WHERE id=?',[placeId]);
+    if(placeId){await pool.execute('DELETE r FROM pacientes_recepcao r JOIN pacientes_unidades un ON un.paciente_id=r.id WHERE un.local_id=?',[placeId]);await pool.execute('DELETE FROM locais_atendimento WHERE id=?',[placeId]);}
     await pool.execute('DELETE FROM usuarios WHERE email IN (?, ?, ?)', [email, otherEmail, professionalEmail]);
     await pool.end();
   }

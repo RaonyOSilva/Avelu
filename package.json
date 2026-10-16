@@ -20,7 +20,11 @@
     "db:setup:consultations": "node scripts/setup-consultations.js",
     "db:setup:experience": "node scripts/setup-experience.js",
     "db:setup:scheduling": "node scripts/setup-scheduling.js",
-    "schedule:run": "node scripts/run-scheduling.js"
+    "schedule:run": "node scripts/run-scheduling.js",
+    "db:setup:operations": "node scripts/setup-operations.js",
+    "backup:create": "node scripts/backup.js",
+    "backup:verify": "node scripts/backup.js --verify",
+    "db:sync:patients": "node scripts/sync-patients.js"
   },
   "engines": {
     "node": ">=20"

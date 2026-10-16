@@ -5,7 +5,7 @@ function safeNext(value) {
   if (!value) return '/agendamentos.html';
   try {
     const url = new URL(value, location.origin);
-    if (url.origin === location.origin && ['/agendar.html', '/agendamentos.html', '/admin.html', '/agenda-admin.html', '/consulta.html', '/profissional.html', '/programacao.html', '/atendimento.html', '/equipe.html'].includes(url.pathname)) return url.pathname + url.search;
+    if (url.origin === location.origin && ['/agendar.html', '/agendamentos.html', '/admin.html', '/agenda-admin.html', '/consulta.html', '/profissional.html', '/operacao.html','/programacao.html', '/atendimento.html', '/equipe.html'].includes(url.pathname)) return url.pathname + url.search;
   } catch { /* Use o destino padrão para URLs inválidas. */ }
   return '/agendamentos.html';
 }
@@ -15,6 +15,7 @@ async function api(url, options = {}) {
   try { response = await fetch(url, { signal: AbortSignal.timeout(15000), ...options, headers: { 'Content-Type': 'application/json', ...options.headers } }); }
   catch { throw new Error('Não foi possível conectar. Verifique sua conexão e tente novamente.'); }
   const data = await response.json().catch(() => ({}));
+  if(data.passwordChangeRequired||data.user?.passwordChangeRequired){location.assign('/senha.html');throw Error('Atualize sua senha inicial para continuar.');}
   if (!response.ok) { const error = new Error(data.error || 'Não foi possível concluir. Tente novamente.'); error.status = response.status; throw error; }
   return data;
 }
@@ -51,8 +52,8 @@ if (page === 'register' || page === 'login') {
     message.textContent = '';
     button.disabled = true; button.textContent = 'Aguarde…';
     try {
-      const result = await api(`/api/auth/${page}`, { method: 'POST', body: JSON.stringify(data) });
-      location.assign(params.has('next') ? next : result.user.role === 'administrador' ? '/admin.html' : result.user.isProfessional ? '/profissional.html' : result.user.canManage ? '/atendimento.html' : next);
+      const result = await api(`/api/auth/${page}`, { method: 'POST', body: JSON.stringify({...data,next}) });
+      location.assign(result.redirect || (result.user.role === 'paciente' ? next : result.user.role === 'administrador' ? '/admin.html' : result.user.role === 'profissional' ? '/profissional.html' : '/atendimento.html'));
     } catch (error) { message.textContent = error.message; }
     finally { button.disabled = false; button.textContent = original; }
   });
@@ -79,7 +80,7 @@ if(page==='booking'){
    for(const slot of available){const label=node('label','','slot'),radio=document.createElement('input');radio.type='radio';radio.name='slotId';radio.value=slot.id;radio.required=true;radio.checked=String(slot.id)===params.get('horario');const details=node('span','','slot-details');details.append(node('strong',dateLabel(slot.inicio_em)),node('span',slot.local_nome),node('small',slot.local_endereco),node('span',priceLabel(slot.valor)));label.append(radio,details);slots.append(label);}
    document.querySelector('#empty-slots').hidden=available.length>0;form.hidden=!available.length;updateReview();
    if(params.has('horario')&&!available.some(slot=>String(slot.id)===params.get('horario')))message.textContent='O horário escolhido não está mais disponível. Selecione outro.';
-   const session=await api('/api/auth/me');user=session.user;
+   const session=await api('/api/auth/me?audience=patient');user=session.user?.role==='paciente'?session.user:null;
    document.querySelector('#booking-note').textContent=user?'Você está conectado como '+user.name+'. Confira o local, o dia e o valor antes de confirmar.':'Entre ou crie sua conta para confirmar. Seu horário ainda não está reservado.';
    form.querySelector('[type=submit]').textContent=user?(params.has('remarcar')?'Confirmar remarcação':'Confirmar agendamento'):'Entrar e continuar';
   }catch(error){message.textContent=error.message;document.querySelector('#retry-slots').hidden=false;}finally{document.querySelector('#loading').hidden=true;}}
@@ -90,7 +91,7 @@ if(page==='appointments'){
  let booked;try{booked=sessionStorage.getItem('avelu-booked');sessionStorage.removeItem('avelu-booked');}catch{}
  const list=document.querySelector('#appointments'),dialog=document.querySelector('#cancel-dialog');let cancelId=null;
  const statusLabels={agendado:'Aguardando confirmação da equipe',confirmado:'Confirmado',concluido:'Atendimento realizado',cancelado:'Cancelado'};
- async function loadAppointments(silent=false){if(silent&&(document.hidden||dialog.open||document.activeElement?.closest('form,button,a')))return;if(!silent)document.querySelector('#loading').hidden=false;document.querySelector('#retry-appointments').hidden=true;
+ async function loadAppointments(silent=false){if(silent&&(document.hidden||dialog.open||document.querySelector('.patient-record[open]')||document.activeElement?.closest('form,button,a')))return;if(!silent)document.querySelector('#loading').hidden=false;document.querySelector('#retry-appointments').hidden=true;
   try{const appointments=await api('/api/appointments');list.replaceChildren();appointments.sort((a,b)=>{const active=x=>['agendado','confirmado'].includes(x.status)&&new Date(x.inicio_em)>new Date();return Number(active(b))-Number(active(a))||(active(a)?new Date(a.inicio_em)-new Date(b.inicio_em):new Date(b.inicio_em)-new Date(a.inicio_em));});
    if(!appointments.length)list.append(node('p','Você ainda não tem agendamentos. Encontre um profissional e escolha seu primeiro horário.','muted'));
    let nextShown=false;for(const a of appointments){const card=node('article','','appointment-item');card.id='agendamento-'+a.id;
@@ -99,7 +100,8 @@ if(page==='appointments'){
  card.append(node('span',statusLabels[a.status]||a.status,'status-pill'),node('h2',a.name),node('p',a.specialty,'muted'),node('p',dateLabel(a.inicio_em)),node('strong',a.local_nome||'Local ainda não informado'),node('p',a.local_endereco||'Confirme o endereço com o profissional.'),node('p',priceLabel(a.valor)));
  card.append(node('p',a.status==='agendado'?'Seu horário está reservado e aguarda confirmação da equipe. Acompanhe a atualização nesta página.':a.status==='confirmado'?'Sua consulta está confirmada. Confira o endereço e compareça no horário agendado.':a.status==='cancelado'?'Este agendamento foi cancelado. Você pode escolher outro horário.':'Atendimento concluído.','appointment-guidance'));
  if(active&&!future)card.append(node('p','O horário agendado já passou. Para alterações, procure a equipe do local.','muted'));
- if(['agendado','confirmado'].includes(a.status)&&new Date(a.inicio_em)>new Date()){const actions=node('div','','booking-actions');const change=node('a','Remarcar','btn btn-light');change.href='agendar.html?profissional='+a.profissional_id+'&remarcar='+a.id;const cancel=action('Cancelar',()=>{cancelId=a.id;document.querySelector('#cancel-detail').textContent=a.name+' · '+dateLabel(a.inicio_em);document.querySelector('#cancel-message').textContent='';dialog.showModal();});actions.append(change,cancel);card.append(actions);}list.append(card);}
+ if(['agendado','confirmado'].includes(a.status)&&new Date(a.inicio_em)>new Date()){const actions=node('div','','booking-actions');const change=node('a','Remarcar','btn btn-light');change.href='agendar.html?profissional='+a.profissional_id+'&remarcar='+a.id;const cancel=action('Cancelar',()=>{cancelId=a.id;document.querySelector('#cancel-detail').textContent=a.name+' · '+dateLabel(a.inicio_em);document.querySelector('#cancel-message').textContent='';dialog.showModal();});actions.append(change,cancel);card.append(actions);}if(typeof window!=='undefined'&&window.enhanceAppointment)window.enhanceAppointment(card,a);list.append(card);}
+   if(window.organizePatientDashboard)window.organizePatientDashboard(appointments);
    if(booked){document.querySelector('#booking-success').hidden=false;const card=document.querySelector('#agendamento-'+booked);if(card){card.classList.add('appointment-selected');card.tabIndex=-1;card.focus();}booked=null;}
   }catch(error){if(error.status===401)return loginFor('/agendamentos.html');message.textContent=error.message;document.querySelector('#retry-appointments').hidden=false;}finally{document.querySelector('#loading').hidden=true;}}
  document.querySelector('#retry-appointments').addEventListener('click',()=>{message.textContent='';loadAppointments();});

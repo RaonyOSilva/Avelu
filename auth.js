@@ -41,11 +41,11 @@ async function hasProfessionalProfile(userId) {
 async function currentUser(request) {
   const token = sessionToken(request);
   if (!token) return null;
-  const [rows] = await pool.execute(`SELECT u.id, u.nome_completo AS name, u.email, u.tipo AS role
+  const [rows] = await pool.execute(`SELECT u.id, u.nome_completo AS name, u.email, u.tipo AS role,u.trocar_senha AS passwordChangeRequired
     FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
     WHERE s.token_hash = ? AND s.expira_em > NOW() AND u.ativo = 1`, [hashToken(token)]);
   if (!rows.length) return null;
-  return { ...rows[0], canManage: await canManage(rows[0]), isProfessional: await hasProfessionalProfile(rows[0].id) };
+  return { ...rows[0], canManage: await canManage(rows[0]), isProfessional: rows[0].role==='profissional' && await hasProfessionalProfile(rows[0].id) };
 }
 
 async function requireUser(request, response, next) {
@@ -109,15 +109,16 @@ function mountAuth(app) {
       const [rows] = await pool.execute('SELECT id, nome_completo AS name, email, tipo AS role, senha_hash FROM usuarios WHERE email = ? AND ativo = 1', [email.trim().toLowerCase()]);
       const user = rows[0];
       if (!(await verifyPassword(password, user?.senha_hash)) || !user) return response.status(401).json({ error: 'E-mail ou senha incorretos.' });
+      if(password.length<8){await pool.execute('UPDATE usuarios SET trocar_senha=1 WHERE id=?',[user.id]);user.passwordChangeRequired=true;}
       await createSession(request, response, user.id);
       delete user.senha_hash;
       user.canManage = await canManage(user);
-      user.isProfessional = await hasProfessionalProfile(user.id);
-      response.json({ user });
+      user.isProfessional = user.role==='profissional' && await hasProfessionalProfile(user.id);
+      response.json({ user, redirect: require('./access-policy').loginDestination(user,request.body?.next) });
     } catch (error) { next(error); }
   });
   app.get('/api/auth/me', async (request, response, next) => {
-    try { response.json({ user: await currentUser(request) }); } catch (error) { next(error); }
+    try { const user=await currentUser(request);response.json({ user: request.query.audience==='patient' && user?.role!=='paciente' ? null : user }); } catch (error) { next(error); }
   });
   app.post('/api/auth/logout', async (request, response, next) => {
     try {

@@ -94,7 +94,7 @@ Para atualizar uma instalação existente com as migrações anteriores aplicada
 Na Área de atendimento é possível:
 
 - Filtrar a agenda por dia, profissional e unidade, com resumo de vagas livres, a confirmar, confirmadas e canceladas.
-- Publicar um intervalo de até 12 horas dividido em consultas, por exemplo, 08h–12h em consultas de 30 minutos. O intervalo precisa ser divisível pela duração. Preencha uma data por publicação; recorrência semanal ainda não está incluída.
+- Publicar um intervalo de até 12 horas dividido em consultas, por exemplo, 08h–12h em consultas de 30 minutos. Sobras menores que uma consulta não geram vagas. Para vários dias, use **Publicar por período**.
 - Bloquear ou reabrir vagas futuras. Intervalos sobrepostos do mesmo profissional são recusados, inclusive em outra unidade.
 - Selecionar **Agendar paciente** em uma vaga livre e registrar nome, telefone e e-mail opcional. A reserva manual usa a mesma proteção contra concorrência da reserva online.
 - Confirmar, cancelar com motivo e concluir atendimentos já iniciados. Ao cancelar, a equipe escolhe se libera a vaga novamente ou a mantém bloqueada.
@@ -144,3 +144,32 @@ Na área do profissional, **Todos atendimentos agendados** lista exclusivamente 
 
 ### Confirmação pelo WhatsApp
 Após confirmar, a recepção visualiza a aba Confirmados e o botão **Enviar confirmação pelo WhatsApp**. A conversa abre com a mensagem preenchida, usando o telefone do agendamento/cadastro, nome, data e horário de Brasília, profissional e endereço registrado na reserva. A secretária deve clicar em Enviar no WhatsApp. Abrir a conversa não é registrado como entrega. Telefones brasileiros inválidos ou dados incompletos exibem orientação para correção. Não há envio automático ou integração contratada.
+
+## Operação integrada (recepção, profissional, paciente e administração)
+
+Atualizações existentes: execute `npm run db:setup:operations` e `npm run db:sync:patients`, depois reinicie o servidor. A sincronização é repetível: usa o ID da conta para pacientes online; cadastros manuais antigos ficam separados até um vínculo verificado, sem unir pessoas por semelhança de nome ou telefone.
+
+- **Fila:** a recepção registra chegada, corrige presença e marca não comparecimento somente depois do horário previsto. O profissional inicia e continua o atendimento pela própria agenda. A fila só muda na data da consulta; a confirmação permanece um estado separado. A recepção não cancela/remarca um atendimento em andamento. Cancelamento pelo profissional preserva o registro para leitura.
+- **Pacientes:** menu lateral → Pacientes; busca, cadastro, edição de contatos administrativos, identificação de possíveis duplicidades e histórico de agendamentos limitado às unidades autorizadas. A seleção no agendamento manual reutiliza o cadastro. Dados clínicos não são expostos à recepção.
+- **Vínculo com conta:** o paciente gera um código em Minha conta, válido por 30 minutos e de uso único, e o fornece à equipe. O vínculo consolida o cadastro selecionado com a conta indicada pelo código; não se faz associação automática por e-mail/telefone. Alterações no cadastro administrativo preservam os dados originais das reservas e não alteram a conta online.
+- **Descoberta:** cidade na página inicial, filtros Hoje/Esta semana/Primeira disponibilidade e particular/convênio na busca. A seleção de convênio usa os dados da unidade, não garante cobertura de um procedimento ou profissional.
+- **Paciente:** mapa do endereço reservado, arquivo `.ics` para importar no calendário, contato do local, orientações atuais e linha do tempo administrativa. Reservas antigas podem não possuir eventos anteriores à implantação.
+- **Administração:** menu → Visão geral (próximos ou últimos 30 dias), Usuários e permissões (revogar vínculo ou desativar conta), Histórico de ações, Orientações e convênios. Não é permitido desativar a própria conta nem outro administrador pela interface. Desativação revoga sessões e não apaga históricos.
+- **Comunicação:** mensagens de confirmação, solicitação/remarcação pendente e cancelamento continuam manuais no WhatsApp. Abrir mensagem e informar envio são eventos distintos; nenhum deles comprova entrega. A central mostra até 200 agendamentos a partir de 30 dias atrás.
+- **Senhas:** Minha senha permite definir uma senha pessoal. Ao entrar com senha curta de teste (menos de 8 caracteres), é exigida sua substituição antes de acessar módulos protegidos. A troca encerra as sessões anteriores.
+- **Funcionamento:** a visão geral mostra falhas de API desde a inicialização (sem registrar textos clínicos ou credenciais), configuração de e-mail/HTTPS e situação do backup. Isso não substitui um monitor externo quando houver hospedagem.
+
+### Backup local e teste de restauração
+
+`npm run backup:create` usa mysqldump com transação consistente e grava somente um arquivo criptografado AES-256-GCM. Configure `BACKUP_DIR`, `BACKUP_KEY` (32 bytes em hexadecimal) e `MYSQLDUMP_PATH` no `.env`. A chave nunca é servida pela aplicação; `.env` e `.backups/` são ignorados pelo Git. Guarde a chave em um local seguro separado: sem ela não é possível restaurar a cópia.
+
+Com essas variáveis, o servidor verifica a cada hora e cria uma cópia quando a última tem mais de 24 horas. O computador e o servidor precisam estar ligados. `npm run backup:verify` restaura a última cópia em um banco aleatório `avelu_restore_test_*`, verifica leitura de todas as tabelas e remove apenas esse banco temporário; requer permissão para criar/excluir banco de teste. O banco principal não é substituído. O status registra a data do teste de restauração.
+
+Neste ambiente, o backup está configurado em `.backups`, no mesmo computador. A cópia fora da máquina, o domínio HTTPS e a entrega de recuperação de senha por e-mail continuam dependendo da futura hospedagem e serviço externo. Não há envio de e-mail ativado no localhost.
+# Tipos de acesso aos módulos
+
+O campo `usuarios.tipo` define um único tipo de acesso por conta: Cliente (`paciente`, tipo 1 na interface), Profissional (`profissional`, tipo 2), Equipe/secretária (`equipe`, tipo 3) e Administrador (`administrador`, tipo 4). Os números são rótulos de apresentação; o banco mantém valores descritivos.
+
+Execute `node scripts/setup-access.js` em bancos existentes. Clientes não são promovidos por vínculos antigos. Contas antigas de profissional sem perfil clínico e com vínculos de gestão são classificadas como equipe. Revise os tipos em **Usuários e permissões**. Alterar o tipo encerra todas as sessões da conta e registra a ação na auditoria.
+
+Clientes acessam somente seus agendamentos e registros; profissionais acessam seu módulo clínico; equipe acessa a gestão de agendas dentro dos vínculos concedidos; administradores mantêm os módulos administrativos e de gestão, sem acesso ao módulo clínico. As regras são verificadas no servidor para páginas e APIs. Vínculos de gestão não substituem o tipo de conta. Uma pessoa que precise atuar em funções diferentes deve utilizar contas separadas.

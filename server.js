@@ -16,6 +16,14 @@ const port = Number(process.env.PORT || 3000);
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json({ limit: '100kb' }));
+app.use(async(req,res,next)=>{
+ try{const policy=require('./access-policy'),roles=policy.apiRoles(req.path)||policy.pageRoles(req.path,req.query);
+ if(!roles)return next();const user=await require('./auth').currentUser(req);
+ res.set('Cache-Control','no-store');
+ if(!user){if(req.path.startsWith('/api/'))return res.status(401).json({error:'Entre na sua conta para continuar.'});return res.redirect('/entrar.html?next='+encodeURIComponent(req.originalUrl));}
+ if(!roles.includes(user.role)){if(req.path.startsWith('/api/'))return res.status(403).json({error:'Seu tipo de conta não permite acessar este módulo.'});return res.redirect(policy.home(user));}
+ next();}catch(e){next(e);}
+});
 app.use('/api', (request, response, next) => {
   response.set('Cache-Control', 'no-store');
   if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
@@ -25,7 +33,7 @@ app.use('/api', (request, response, next) => {
   next();
 });
 // Sirva apenas arquivos públicos: código do servidor e SQL ficam privados.
-const publicFiles = new Set(['programacao.html','programacao.js','programacao.css','consulta-modelos.js','atendimento-extras.js','consulta.html','consulta.js','consulta.css','profissional.html','profissional.js','profissional.css','agendar-local.html', 'agendar-local.js', 'agendar-local.css', 'atendimento.html', 'atendimento.js', 'atendimento.css', 'equipe.html', 'equipe.js', 'recuperar.html', 'recuperar.js', 'agenda-admin.html', 'agenda-admin.js', 'index.html', 'sobre.html', 'buscar.html', 'buscar.js', 'buscar.css', 'perfil.html', 'perfil.js', 'perfil.css', 'cadastro.html', 'entrar.html', 'agendar.html', 'agendamentos.html', 'admin.html', 'admin-ui.js', 'admin.css', 'paginas.css', 'conta.css', 'app.js', 'conta.js', 'service-worker.js', 'manifest.webmanifest']);
+const publicFiles = new Set(['session-exit.js','senha.html','senha.js','operacao.html','operations-ui.js','workspace.js','workspace.css','patient-tools.js','reception-patients.js','home-discovery.js','programacao.html','programacao.js','programacao.css','consulta-modelos.js','atendimento-extras.js','consulta.html','consulta.js','consulta.css','profissional.html','profissional.js','profissional.css','agendar-local.html', 'agendar-local.js', 'agendar-local.css', 'atendimento.html', 'atendimento.js', 'atendimento.css', 'equipe.html', 'equipe.js', 'recuperar.html', 'recuperar.js', 'agenda-admin.html', 'agenda-admin.js', 'index.html', 'sobre.html', 'buscar.html', 'buscar.js', 'buscar.css', 'perfil.html', 'perfil.js', 'perfil.css', 'cadastro.html', 'entrar.html', 'agendar.html', 'agendamentos.html', 'admin.html', 'admin-ui.js', 'admin.css', 'paginas.css', 'conta.css', 'app.js', 'conta.js', 'service-worker.js', 'manifest.webmanifest']);
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use((request, response, next) => {
   const file = request.path === '/' ? 'index.html' : request.path.slice(1);
@@ -35,9 +43,11 @@ app.use((request, response, next) => {
 
 mountAuth(app);
 require('./account')(app);
+app.use('/api',async(req,res,next)=>{try{if(!/^\/(team|professional|admin|consultations|appointments|account)(?:\/|$)/i.test(req.path))return next();const user=await require('./auth').currentUser(req);if(user?.passwordChangeRequired)return res.status(403).json({error:'Atualize sua senha inicial para continuar.',passwordChangeRequired:true});next();}catch(e){next(e);}});
 mountAppointments(app);
 mountAdmin(app);
 mountProfiles(app);
+require('./discovery')(app);
 require('./team-access')(app);
 require('./team')(app);
 require('./consultations')(app);
@@ -100,6 +110,7 @@ app.use('/api', (_request, response) => {
 });
 
 app.use((error, _request, response, _next) => {
+  require('./runtime-health').failure();
   console.error('Falha na API:', error.code || error.name);
   if (error.type === 'entity.parse.failed') return response.status(400).json({ error: 'Dados inválidos.' });
   response.status(500).json({ error: 'Não foi possível concluir a operação.' });
@@ -111,9 +122,11 @@ const server = app.listen(port, () => {
   console.log(`Avelu disponível em http://localhost:${server.address().port}`);
 });
 
+const stopBackup=process.env.NODE_ENV!=='test'&&port!==0?require('./backup-service').start():()=>{};
 const stopScheduling=process.env.NODE_ENV!=='test'&&port!==0?require('./schedule-service').startWorker():()=>{};
 
 async function shutdown() {
+  stopBackup();
   stopScheduling();
   server.close(async () => {
     await pool.end();

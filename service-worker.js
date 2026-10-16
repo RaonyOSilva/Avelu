@@ -1,5 +1,5 @@
-const CACHE='avelu-v10';
-const FILES=['./','./index.html','./sobre.html','./cadastro.html','./entrar.html','./agendar.html','./agendamentos.html','./paginas.css','./conta.css','./conta.js','./app.js','./manifest.webmanifest','./assets/icon.svg','./assets/logo.png','./assets/hero-woman.png','./assets/avatar-gustavo.png','./assets/avatar-mariana.png','./assets/avatar-pedro.png'];
+const CACHE='avelu-v11';
+const FILES=['./','./index.html','./sobre.html','./cadastro.html','./entrar.html','./agendar.html','./paginas.css','./conta.css','./conta.js','./app.js','./manifest.webmanifest','./assets/icon.svg','./assets/logo.png','./assets/hero-woman.png','./assets/avatar-gustavo.png','./assets/avatar-mariana.png','./assets/avatar-pedro.png'];
 FILES.push('./buscar.html','./buscar.css','./buscar.js');
 FILES.push('./recuperar.html','./recuperar.js');
 FILES.push('./perfil.html','./perfil.css','./perfil.js');

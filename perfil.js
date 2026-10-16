@@ -45,5 +45,5 @@ async function load(){
     document.querySelector('#profile').hidden=false;status.hidden=true;
   }catch(error){status.textContent=error.name==='TimeoutError'?'O carregamento demorou mais que o esperado.':error.message;const retry=node('button','Tentar novamente','btn btn-light');retry.addEventListener('click',()=>location.reload());status.append(retry);}
 }
-fetch('/api/auth/me').then(response=>response.ok?response.json():null).then(session=>{if(session?.user){const link=document.querySelector('#account-link');link.href=session.user.role==='administrador'?'admin.html':session.user.canManage?'atendimento.html':'agendamentos.html';link.textContent=session.user.role==='administrador'?'Administrar':session.user.canManage?'Área de atendimento':'Minha conta';}}).catch(()=>{});
+fetch('/api/auth/me?audience=patient').then(response=>response.ok?response.json():null).then(session=>{if(session?.user?.role==='paciente'){const link=document.querySelector('#account-link');link.href=session.user.role==='administrador'?'admin.html':session.user.isProfessional?'profissional.html':session.user.role==='equipe'?'atendimento.html':'agendamentos.html';link.textContent=session.user.role==='administrador'?'Administrar':session.user.isProfessional?'Minha agenda':session.user.role==='equipe'?'Área de atendimento':'Minha conta';}}).catch(()=>{});
 load();

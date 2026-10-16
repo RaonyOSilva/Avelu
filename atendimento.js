@@ -47,14 +47,14 @@ function openAction(slot,type){
 }
 function render(){
   document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===view)));
-  const titles={agenda:'Agenda de ',disponivel:'Horários livres de ',agendado:'A confirmar em ',confirmado:'Confirmados em ',cancelled:'Cancelamentos de '};
+  const titles={agenda:'Agenda de ',disponivel:'Horários livres de ',agendado:'A confirmar em ',confirmado:'Confirmados em ',cancelled:'Cancelamentos de ',aguardando:'Pacientes aguardando em ',em_atendimento:'Em atendimento em ',faltou:'Não compareceram em '};
   $('#agenda-title').textContent=titles[view]+dayLabel(filters.elements.dia.value);
   $('#count-free').textContent=slots.filter(s=>s.status==='disponivel'&&new Date(s.inicio_em)>new Date()).length;
   $('#count-pending').textContent=slots.filter(s=>s.agendamento_status==='agendado').length;
-  $('#count-confirmed').textContent=slots.filter(s=>s.agendamento_status==='confirmado').length;
+  $('#count-confirmed').textContent=slots.filter(s=>s.agendamento_status==='confirmado'&&s.fluxo!=='faltou').length;
   $('#count-cancelled').textContent=cancelled.length;
-  const list=$('#agenda-list');list.replaceChildren();const items=view==='cancelled'?cancelled:view==='agenda'?slots:slots.filter(s=>view==='disponivel'?s.status==='disponivel'&&new Date(s.inicio_em)>new Date():s.agendamento_status===view);
-  const emptyTitles={agenda:'Nenhum horário neste dia',disponivel:'Nenhum horário livre neste dia',agendado:'Nenhum atendimento aguardando confirmação',confirmado:'Nenhum atendimento confirmado neste dia',cancelled:'Nenhum cancelamento neste dia'};
+  const list=$('#agenda-list');list.replaceChildren();const items=view==='cancelled'?cancelled:view==='agenda'?slots:slots.filter(s=>view==='disponivel'?s.status==='disponivel'&&new Date(s.inicio_em)>new Date():(['aguardando','em_atendimento','faltou'].includes(view)?s.agendamento_status==='confirmado'&&s.fluxo===view:s.agendamento_status===view&&s.fluxo!=='faltou'));
+  const emptyTitles={agenda:'Nenhum horário neste dia',disponivel:'Nenhum horário livre neste dia',agendado:'Nenhum atendimento aguardando confirmação',confirmado:'Nenhum atendimento confirmado neste dia',cancelled:'Nenhum cancelamento neste dia',aguardando:'Nenhum paciente aguardando',em_atendimento:'Nenhum atendimento em andamento',faltou:'Nenhuma falta registrada'};
   if(!items.length){const box=node('div','','empty-agenda');box.append(node('h3',emptyTitles[view]),node('p',view==='agenda'?'Escolha outra data ou disponibilize horários para começar.':'Consulte outra data ou selecione Agenda completa para ver os demais horários.'));list.append(box);return;}
   for(const slot of items){
     const card=node('article','','agenda-card'),time=node('div','','agenda-time');time.append(node('strong',hour(slot.inicio_em)),node('small',slot.fim_em?'até '+hour(slot.fim_em):''));
@@ -64,7 +64,14 @@ function render(){
     if(slot.paciente){patient.append(node('strong',slot.paciente));if(slot.telefone){const tel=node('a',slot.telefone);tel.href='tel:'+slot.telefone.replace(/\D/g,'');patient.append(tel);}if(slot.email)patient.append(node('small',slot.email));patient.append(node('small',slot.origem==='manual'?'Agendamento da recepção':view!=='cancelled'?'Agendamento pelo site':''));}
     else patient.append(node('p',state==='disponivel'?'Disponível para agendar':state==='encerrado'?'Horário passado — não disponível para agendar':state==='bloqueado'?'Fora da agenda online':'Sem paciente informado'));
     if(view==='cancelled'&&slot.motivo_cancelamento)patient.append(node('p',slot.motivo_cancelamento));
+    if(slot.agendamento_status==='confirmado'&&slot.fluxo&&slot.fluxo!=='previsto')patient.append(node('span',({aguardando:'Paciente chegou',em_atendimento:'Em atendimento',faltou:'Não compareceu'})[slot.fluxo],'agenda-status'));
     const actions=node('div','','agenda-actions'),future=new Date(slot.inicio_em)>new Date();
+    if(slot.agendamento_status==='confirmado'&&slot.inicio_em.slice(0,10)===today()&&slot.fluxo!=='em_atendimento'){
+      const change=async fluxo=>{try{await api('/api/team/queue/'+slot.agendamento_id,{fluxo});await loadAgenda();}catch(e){$('#agenda-message').textContent=e.message;}};
+      if(!slot.fluxo||slot.fluxo==='previsto')actions.append(button('Paciente chegou',()=>change('aguardando'),true));
+      if(slot.fluxo==='aguardando'||slot.fluxo==='faltou')actions.append(button('Corrigir presença',()=>change('previsto')));
+      if(slot.fluxo!=='faltou'&&new Date(slot.fim_em)<=new Date())actions.append(button('Não compareceu',()=>{if(confirm('Registrar que o paciente não compareceu?'))change('faltou');}));
+    }
     if(view!=='cancelled'){
       if(slot.status==='disponivel'&&future){actions.append(button('Agendar paciente',()=>openManual(slot),true),button('Bloquear',()=>openAction(slot,'bloqueado')));}
       if(slot.status==='bloqueado'&&future)actions.append(button('Reabrir horário',()=>openAction(slot,'disponivel')));

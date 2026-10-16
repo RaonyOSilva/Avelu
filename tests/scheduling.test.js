@@ -10,7 +10,7 @@ test('programações: prévia, concorrência, escopo, retirada e janela móvel',
  await require('../scripts/setup-scheduling').setupScheduling(pool);
  child=spawn(process.execPath,['server.js'],{cwd:path.join(__dirname,'..'),env:{...process.env,PORT:'0',NODE_ENV:'test',APP_ORIGIN:''},stdio:['ignore','pipe','pipe']});
  base=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Servidor não iniciou')),10000);child.once('error',reject);child.stdout.on('data',b=>{const m=b.toString().match(/http:\/\/localhost:\d+/);if(m){clearTimeout(timer);resolve(m[0]);}});});
- const doctor=await account('Doutor'),staff=await account('Equipe','paciente'),other=await account('Outra equipe','paciente'),patient=await account('Paciente','paciente');
+ const doctor=await account('Doutor'),staff=await account('Equipe','equipe'),other=await account('Outra equipe','equipe'),patient=await account('Paciente','paciente');
  const [p]=await pool.execute("INSERT INTO perfis_profissionais(usuario_id,titulo_profissional) VALUES (?,'Clínico')",[doctor.id]);profiles.push(p.insertId);
  for(const name of ['Unidade A','Unidade B']){const [l]=await pool.execute("INSERT INTO locais_atendimento(nome,tipo,endereco,cidade,estado,ativo) VALUES (?,'clinica','Rua','Governador Valadares','MG',1)",[name]);places.push(l.insertId);await pool.execute('INSERT INTO profissionais_locais(profissional_id,local_id) VALUES (?,?)',[p.insertId,l.insertId]);}
  await pool.execute('INSERT INTO gestao_acessos(usuario_id,local_id) VALUES (?,?),(?,?)',[staff.id,places[0],other.id,places[1]]);

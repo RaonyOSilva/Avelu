@@ -21,7 +21,7 @@ test('área de atendimento: isolamento, agenda online e recepção',{timeout:400
   try{
     child=spawn(process.execPath,['server.js'],{cwd:path.join(__dirname,'..'),env:{...process.env,PORT:'0',NODE_ENV:'test',APP_ORIGIN:''},stdio:['ignore','pipe','pipe']});
     base=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Servidor não iniciou.')),10000);child.once('error',reject);child.stdout.on('data',b=>{const match=b.toString().match(/http:\/\/localhost:\d+/);if(match){clearTimeout(timer);resolve(match[0]);}});});
-    const admin=await account('admin','administrador'),secretary=await account('recepcao','paciente'),other=await account('outra-recepcao'),doctor=await account('medico'),patient=await account('paciente','paciente');
+    const admin=await account('admin','administrador'),secretary=await account('recepcao','equipe'),other=await account('outra-recepcao','equipe'),doctor=await account('medico'),patient=await account('paciente','paciente');
     for(const name of ['Unidade A','Unidade B']){const [r]=await pool.execute("INSERT INTO locais_atendimento (nome,tipo,endereco,cidade,estado,ativo) VALUES (?,'clinica','Rua do teste','Governador Valadares','MG',1)",[name]);places.push(r.insertId);}
     const [p]=await pool.execute("INSERT INTO perfis_profissionais (usuario_id,titulo_profissional) VALUES (?,'Ortopedia')",[doctor.id]);profiles.push(p.insertId);
     for(const local of places)await pool.execute('INSERT INTO profissionais_locais (profissional_id,local_id) VALUES (?,?)',[p.insertId,local]);
@@ -37,7 +37,7 @@ test('área de atendimento: isolamento, agenda online e recepção',{timeout:400
       assert.equal((await request('/api/auth/me',null,secretary)).data.user.canManage,true);
       assert.equal((await request('/api/admin/professionals',null,secretary)).status,403);
       const context=await request('/api/team/context',null,secretary);assert.equal(context.data.pairs.length,1);assert.equal(context.data.pairs[0].local_id,places[0]);
-      assert.equal((await request('/api/team/context',null,doctor)).data.pairs.length,2);
+      assert.equal((await request('/api/professional/context',null,doctor)).data.pairs.length,2);
     });
     await t.test('local autorizado aparece mesmo sem profissionais, sem expor outras unidades',async()=>{
       await pool.execute('DELETE FROM profissionais_locais WHERE profissional_id=? AND local_id=?',[p.insertId,places[0]]);
@@ -47,7 +47,7 @@ test('área de atendimento: isolamento, agenda online e recepção',{timeout:400
         assert.deepEqual(context.data.places.map(l=>l.id),[places[0]]);
         const adminContext=await request('/api/team/context',null,admin);
         assert.ok(adminContext.data.places.some(l=>l.id===places[0]));
-        const doctorContext=await request('/api/team/context',null,doctor);
+        const doctorContext=await request('/api/professional/context',null,doctor);
         assert.deepEqual(doctorContext.data.places.map(l=>l.id),[places[1]]);
       } finally { await pool.execute('INSERT INTO profissionais_locais (profissional_id,local_id) VALUES (?,?)',[p.insertId,places[0]]); }
     });
@@ -131,6 +131,10 @@ test('área de atendimento: isolamento, agenda online e recepção',{timeout:400
       assert.equal((await request('/api/professional/appointments/'+confirmed.agendamento_id+'/state',{status:'concluido'},doctor)).status,409);
       assert.equal((await request('/api/professional/appointments/'+confirmed.agendamento_id+'/state',{status:'confirmado'},doctor)).status,403);
       assert.equal((await request('/api/auth/me',null,doctor)).data.user.isProfessional,true);
+      const ownAccount=await request('/api/professional/account',null,doctor);
+      assert.equal(ownAccount.status,200);assert.equal(ownAccount.data.email,doctor.email);
+      assert.equal('senha_hash' in ownAccount.data,false);
+      assert.equal((await request('/api/professional/account',null,secretary)).status,403);
     });
 
     await t.test('registro clínico é privado, persiste rascunhos e finaliza de forma atômica',async()=>{
@@ -138,7 +142,7 @@ test('área de atendimento: isolamento, agenda online e recepção',{timeout:400
       const [appointments]=await pool.execute("SELECT id FROM agendamentos WHERE disponibilidade_id=? AND status='confirmado'",[slotA]);
       const id=appointments[0].id,url='/api/consultations/'+id;
       assert.equal((await request(url)).status,401);
-      for(const actor of [patient,secretary,other,admin])assert.equal((await request(url,null,actor)).status,404);
+      for(const actor of [patient,secretary,other,admin])assert.equal((await request(url,null,actor)).status,403);
       const initial=await request(url,null,doctor);assert.equal(initial.status,200);assert.equal(initial.data.record.versao,0);
       assert.equal(initial.data.appointment.profissional,'medico');assert.ok(!JSON.stringify(initial.data).includes('senha_hash'));
       const draft={evolucao:'Avaliação registrada pelo profissional.\nConduta de teste.',receita:'Texto de receita de teste.',versao:0,finalizar:false};
@@ -147,7 +151,7 @@ test('área de atendimento: isolamento, agenda online e recepção',{timeout:400
       await pool.execute("UPDATE disponibilidades SET inicio_em='2020-01-01 08:00:00',fim_em='2020-01-01 08:30:00' WHERE id=?",[slotA]);
       assert.equal((await request(url,draft,doctor)).status,409);
       await pool.execute('UPDATE disponibilidades SET inicio_em=?,fim_em=? WHERE id=?',[currentDay+' 23:58:00',currentDay+' 23:59:00',slotA]);
-      assert.equal((await request(url,draft,secretary)).status,404);
+      assert.equal((await request(url,draft,secretary)).status,403);
       const saved=await request(url,draft,doctor);assert.equal(saved.status,200);assert.equal(saved.data.record.versao,1);
       assert.equal((await request(url,null,doctor)).data.record.evolucao,draft.evolucao);
       assert.equal((await request(url,draft,doctor)).status,409);
@@ -157,6 +161,16 @@ test('área de atendimento: isolamento, agenda online e recepção',{timeout:400
       assert.equal((await request(url,{...draft,versao:2},doctor)).status,409);
       assert.equal((await request(url,null,doctor)).data.record.receita,draft.receita);
       const [status]=await pool.execute('SELECT status FROM agendamentos WHERE id=?',[id]);assert.equal(status[0].status,'concluido');
+      const [dates]=await pool.execute("SELECT DATE_FORMAT(d.inicio_em,'%Y-%m-%d') AS day FROM disponibilidades d JOIN agendamentos a ON a.disponibilidade_id=d.id WHERE a.id=?",[id]);
+      const reportUrl='/api/professional/report?inicio='+dates[0].day+'&fim='+dates[0].day;
+      const report=await request(reportUrl,null,doctor);
+      assert.equal(report.status,200);assert.ok(report.data.items.some(a=>a.id===id));
+      assert.ok(report.data.items.every(a=>!('evolucao' in a)));
+      assert.equal((await request(reportUrl,null,secretary)).status,403);
+      assert.equal((await request('/api/professional/report?inicio=2026-02-30&fim=2026-03-01',null,doctor)).status,400);
+      assert.equal((await request('/api/professional/report?inicio=2026-03-02&fim=2026-03-01',null,doctor)).status,400);
+      assert.equal((await request('/api/professional/report?inicio=2020-01-01&fim=2026-01-01',null,doctor)).status,400);
+
     });
     await t.test('primeiro acesso não altera a senha de contas existentes e revogação é imediata',async()=>{
       const created=await request('/api/admin/team-access',{email:createdEmail,nome:'Nova secretária',senha:'Senha inicial 123',tipo:'local',escopo_id:places[0]},admin);assert.equal(created.status,201);
@@ -175,8 +189,8 @@ test('área de atendimento: isolamento, agenda online e recepção',{timeout:400
   }finally{
     if(child){const stopped=new Promise(resolve=>child.once('exit',resolve));child.kill();await stopped;}
     for(const id of profiles){await pool.execute('DELETE FROM agendamentos WHERE profissional_id=?',[id]);await pool.execute('DELETE FROM perfis_profissionais WHERE id=?',[id]);}
-    for(const id of places)await pool.execute('DELETE FROM locais_atendimento WHERE id=?',[id]);
-    for(const id of users)await pool.execute('DELETE FROM usuarios WHERE id=?',[id]);
+    for(const id of places){await pool.execute('DELETE r FROM pacientes_recepcao r JOIN pacientes_unidades un ON un.paciente_id=r.id WHERE un.local_id=?',[id]);await pool.execute('DELETE FROM locais_atendimento WHERE id=?',[id]);}
+    for(const id of users){await pool.execute('DELETE FROM administracao_eventos WHERE usuario_id=?',[id]);await pool.execute('DELETE FROM usuarios WHERE id=?',[id]);}
     await pool.execute('DELETE FROM usuarios WHERE email=?',[createdEmail]);await pool.end();
   }
 });

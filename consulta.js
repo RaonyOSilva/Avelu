@@ -21,13 +21,13 @@ async function load(){
  if(!/^[1-9]\d{0,14}$/.test(id||''))throw Error('Escolha um atendimento na sua agenda.');
  if(dirty){$('#message').textContent='Há anotações não salvas. Salve antes de recarregar.';return;}
  const data=await api();appointment=data.appointment;record=data.record;renderHistory(data.history||[]);
- locked=appointment.status==='concluido'||!!record.finalizado_em;
+ locked=['concluido','cancelado'].includes(appointment.status)||!!record.finalizado_em;
  $('#patient-name').textContent=appointment.paciente||'Paciente';
  $('#appointment-context').textContent=dateLabel(appointment.inicio_em)+' · '+(appointment.local||'Local não informado');
  const details=$('#patient-details');details.replaceChildren();
  for(const [label,value] of [['Telefone',appointment.telefone],['E-mail',appointment.email],['Motivo do agendamento',appointment.motivo],['Endereço do atendimento',appointment.endereco]]){const div=node('div','');div.append(node('dt',label),node('dd',value||'Não informado'));details.append(div);}
  $('#evolution').value=record.evolucao;$('#prescription').value=record.receita;dirty=false;
- $('#workspace').hidden=false;$('#message').textContent=locked?'Atendimento finalizado. Registro disponível para consulta e impressão.':'';
+ $('#workspace').hidden=false;$('#message').textContent=locked?(appointment.status==='cancelado'?'Atendimento cancelado. Registro preservado somente para consulta e impressão.':'Atendimento finalizado. Registro disponível para consulta e impressão.'):'';
  $('#save-status').textContent=record.versao?'Registro salvo.':'Nenhuma anotação salva ainda.';controls();
  }catch(e){$('#message').textContent=e.message;$('#retry').hidden=false;}
 }

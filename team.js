@@ -32,7 +32,7 @@ async function requireTeam(req,res,next) {
       const [profiles] = await pool.execute('SELECT id FROM perfis_profissionais WHERE usuario_id=? AND ativo=1',[req.user.id]);
       if (!profiles.length) return res.status(403).json({error:'Esta conta não possui um perfil profissional ativo. Entre com sua conta de profissional.'});
       req.user.ownProfessionalId=profiles[0].id;
-      if(req.method==='POST' && !/^\/(?:password|appointments\/\d+\/state)\/?$/i.test(req.path)) return res.status(403).json({error:'A organização dos horários é feita pela equipe de atendimento.'});
+      if(req.method==='POST' && !/^\/(?:password|appointments\/\d+\/state|queue\/\d+\/start)\/?$/i.test(req.path)) return res.status(403).json({error:'A organização dos horários é feita pela equipe de atendimento.'});
     }
     if (!req.user.ownProfessionalId && !await canManage(req.user)) return res.status(403).json({ error:'Seu acesso à agenda precisa ser liberado pelo administrador da Avelu.' });
     next();
@@ -43,13 +43,36 @@ module.exports = function mountTeam(app) {
   app.use(['/api/team','/api/professional'], requireTeam);
   require('./team-experience')(app);
   require('./team-scheduling')(app);
+  require('./operations')(app);
+  app.get('/api/professional/account',async(req,res,next)=>{
+    res.set('Cache-Control','no-store');
+    try{const [rows]=await pool.execute(`SELECT u.nome_completo AS nome,u.email,u.telefone,p.titulo_profissional,p.numero_registro,p.biografia
+      FROM perfis_profissionais p JOIN usuarios u ON u.id=p.usuario_id WHERE p.id=? AND p.usuario_id=?`,[req.user.ownProfessionalId,req.user.id]);
+      res.json(rows[0]);
+    }catch(e){next(e);}
+  });
+  app.get('/api/professional/report',async(req,res,next)=>{
+    res.set('Cache-Control','no-store');
+    try{
+      const start=date(String(req.query.inicio||'')+'T00:00'),end=date(String(req.query.fim||'')+'T00:00');
+      if(end<start||end-start>365*86400000)throw fail('Selecione um período de até 366 dias, com fim igual ou posterior ao início.',400);
+      const [items]=await pool.execute(`SELECT a.id,COALESCE(a.nome_paciente,u.nome_completo) AS paciente,a.local_nome AS local,
+       DATE_FORMAT(d.inicio_em,'%Y-%m-%dT%H:%i:%s-03:00') AS inicio_em,
+       DATE_FORMAT(r.finalizado_em,'%Y-%m-%dT%H:%i:%s-03:00') AS finalizado_em
+       FROM agendamentos a JOIN disponibilidades d ON d.id=a.disponibilidade_id
+       LEFT JOIN usuarios u ON u.id=a.paciente_id LEFT JOIN registros_atendimentos r ON r.agendamento_id=a.id
+       WHERE a.profissional_id=? AND a.status='concluido' AND d.inicio_em>=? AND d.inicio_em<?
+       ORDER BY d.inicio_em,a.id`,[req.user.ownProfessionalId,sqlDate(start),sqlDate(new Date(+end+86400000))]);
+      res.json({profissional:req.user.name,inicio:req.query.inicio,fim:req.query.fim,items});
+    }catch(e){if(e.status)return res.status(e.status).json({error:e.message});next(e);}
+  });
   app.post(['/api/team/password','/api/professional/password'], authLimit, async (req,res,next) => {
     const b=req.body||{};
     if(typeof b.currentPassword!=='string'||b.currentPassword.length>128||typeof b.password!=='string'||b.password.length<8||b.password.length>128)return res.status(400).json({error:'Informe sua senha atual e uma nova senha de 8 a 128 caracteres.'});
     await transaction(res,next,async c=>{
       const [rows]=await c.execute('SELECT senha_hash FROM usuarios WHERE id=? FOR UPDATE',[req.user.id]);
       if(!rows.length||!await verifyPassword(b.currentPassword,rows[0].senha_hash))throw fail('Senha atual incorreta.',400);
-      await c.execute('UPDATE usuarios SET senha_hash=? WHERE id=?',[await passwordHash(b.password),req.user.id]);
+      await c.execute('UPDATE usuarios SET senha_hash=?,trocar_senha=0 WHERE id=?',[await passwordHash(b.password),req.user.id]);
       await c.execute('DELETE FROM sessoes WHERE usuario_id=?',[req.user.id]);
       await c.execute('DELETE FROM recuperacoes_senha WHERE usuario_id=?',[req.user.id]);
     });
@@ -75,11 +98,11 @@ module.exports = function mountTeam(app) {
       const local=req.query.local||'',page=Number(req.query.page||1);
       if((local&&!validId(local))||!Number.isInteger(page)||page<1||page>100000)return res.status(400).json({error:'Filtros inválidos.'});
       const access=scope(req.user);
-      const where=access.sql+" AND a.status='confirmado' AND (?='' OR d.local_id=?)";
+      const where=access.sql+" AND a.status='confirmado' AND a.fluxo<>'faltou' AND (?='' OR d.local_id=?)";
       const params=[...access.values,local,local];
       const joins=' FROM agendamentos a JOIN disponibilidades d ON d.id=a.disponibilidade_id LEFT JOIN usuarios pu ON pu.id=a.paciente_id LEFT JOIN locais_atendimento l ON l.id=d.local_id ';
       const [totals]=await pool.execute('SELECT COUNT(*) AS total,COUNT(DISTINCT DATE(d.inicio_em)) AS days,COUNT(DISTINCT d.local_id) AS places'+joins+'WHERE '+where,params);
-      const [items]=await pool.execute("SELECT a.id AS agendamento_id,a.status AS agendamento_status,COALESCE(a.nome_paciente,pu.nome_completo) AS paciente,l.nome AS local,DATE_FORMAT(d.inicio_em,'%Y-%m-%dT%H:%i:%s-03:00') AS inicio_em,DATE_FORMAT(d.fim_em,'%Y-%m-%dT%H:%i:%s-03:00') AS fim_em"+joins+'WHERE '+where+' ORDER BY d.inicio_em,a.id LIMIT 50 OFFSET '+((page-1)*50),params);
+      const [items]=await pool.execute("SELECT a.id AS agendamento_id,a.status AS agendamento_status,a.fluxo,COALESCE(a.nome_paciente,pu.nome_completo) AS paciente,l.nome AS local,DATE_FORMAT(d.inicio_em,'%Y-%m-%dT%H:%i:%s-03:00') AS inicio_em,DATE_FORMAT(d.fim_em,'%Y-%m-%dT%H:%i:%s-03:00') AS fim_em"+joins+'WHERE '+where+' ORDER BY d.inicio_em,a.id LIMIT 50 OFFSET '+((page-1)*50),params);
       res.json({slots:items,summary:totals[0],page,hasMore:page*50<totals[0].total});
     } catch(error){next(error);}
   });
@@ -95,7 +118,7 @@ module.exports = function mountTeam(app) {
         DATE_FORMAT(d.inicio_em,'%Y-%m-%dT%H:%i:%s-03:00') AS inicio_em,
         DATE_FORMAT(d.fim_em,'%Y-%m-%dT%H:%i:%s-03:00') AS fim_em,d.status,d.valor,
         u.nome_completo AS profissional,l.nome AS local,p.ativo AND u.ativo AND l.ativo AS publicado,
-        a.id AS agendamento_id,a.status AS agendamento_status,a.origem,a.local_endereco,
+        a.id AS agendamento_id,a.status AS agendamento_status,a.origem,a.local_endereco,a.fluxo,DATE_FORMAT(a.chegada_em,'%Y-%m-%dT%H:%i:%s-03:00') AS chegada_em,
         COALESCE(a.nome_paciente,pu.nome_completo) AS paciente,
         COALESCE(a.telefone_paciente,pu.telefone) AS telefone,
         COALESCE(a.email_paciente,pu.email) AS email
@@ -185,9 +208,19 @@ module.exports = function mountTeam(app) {
         const [waiting]=await c.execute("SELECT * FROM lista_espera WHERE id=? AND profissional_id=? AND local_id=? AND status<>'encerrado' FOR UPDATE",[b.waitlistId,slot.profissional_id,slot.local_id]);
         if(!waiting.length||waiting[0].nome!==b.nome.trim()||waiting[0].telefone!==phone)throw fail('O registro da lista de espera não corresponde a este agendamento. Atualize a lista.');
       }
+      let cadastro;
+      if(b.cadastro_paciente_id){
+        if(!validId(b.cadastro_paciente_id))throw fail('Cadastro inválido.',400);
+        cadastro=await require('./operations').patient(c,req.user,b.cadastro_paciente_id);
+        if(cadastro.nome!==b.nome.trim()||cadastro.telefone!==phone)throw fail('Os dados diferem do cadastro selecionado. Selecione o paciente novamente.');
+      }else{
+        const [created]=await c.execute('INSERT INTO pacientes_recepcao(nome,telefone,email) VALUES (?,?,?)',[b.nome.trim(),phone,b.email||null]);cadastro={id:created.insertId,usuario_id:null};
+      }
+      await c.execute('INSERT IGNORE INTO pacientes_unidades VALUES (?,?)',[cadastro.id,slot.local_id]);
       const [result]=await c.execute(`INSERT INTO agendamentos (paciente_id,profissional_id,disponibilidade_id,local_nome,local_endereco,valor,origem,nome_paciente,telefone_paciente,email_paciente)
         VALUES (NULL,?,?,?,?,?,'manual',?,?,?)`,[slot.profissional_id,slot.id,slot.local_nome,address(slot),slot.valor,b.nome.trim(),phone,b.email?.trim().toLowerCase()||null]);
       await c.execute("UPDATE disponibilidades SET status='reservado' WHERE id=?",[slot.id]);
+      await c.execute('UPDATE agendamentos SET cadastro_paciente_id=?,paciente_id=? WHERE id=?',[cadastro.id,cadastro.usuario_id,result.insertId]);
       await audit(c,req.user,slot.id,'agendar_manual',result.insertId);
       if(b.waitlistId)await c.execute("UPDATE lista_espera SET status='encerrado' WHERE id=?",[b.waitlistId]);
       return {id:result.insertId};
@@ -205,6 +238,9 @@ module.exports = function mountTeam(app) {
       if(!['agendado','confirmado'].includes(appointment.status))throw fail('Este agendamento já foi encerrado.');
       if(b.status==='concluido'&&req.user.ownProfessionalId&&appointment.dia!==new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()))throw fail('O atendimento pode ser realizado somente na data agendada.');
       if(b.status==='concluido'&&!req.user.ownProfessionalId&&new Date(appointment.inicio_em)>new Date())throw fail('O atendimento ainda não começou.');
+      const [flow]=await c.execute('SELECT fluxo FROM agendamentos WHERE id=?',[appointment.id]);
+      if(flow[0].fluxo==='faltou'&&b.status==='concluido')throw fail('Corrija a falta antes de concluir o atendimento.');
+      if(flow[0].fluxo==='em_atendimento'&&!(req.user.ownProfessionalId&&b.status==='cancelado'))throw fail('O atendimento está em andamento. Finalize no registro clínico.');
       if(b.status==='confirmado'&&appointment.status!=='agendado')throw fail('O atendimento já está confirmado.');
       await c.execute('UPDATE agendamentos SET status=?,motivo_cancelamento=? WHERE id=?',[b.status,b.status==='cancelado'?b.motivo.trim():null,appointment.id]);
       if(b.status==='cancelado')await c.execute('UPDATE disponibilidades SET status=? WHERE id=?',[b.liberar?'disponivel':'bloqueado',appointment.disponibilidade_id]);

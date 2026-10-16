@@ -28,6 +28,8 @@ async function main() {
     await require('./setup-consultations').setupConsultations(connection);
     await require('./setup-experience').setupExperience(connection);
     await require('./setup-scheduling').setupScheduling(connection);
+    await require('./setup-operations').setupOperations(connection);
+    await require('./setup-access').setupAccess(connection);
     console.log('Banco Avelu criado e dados iniciais inseridos.');
   } finally {
     await connection.end();

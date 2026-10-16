@@ -11,7 +11,7 @@ test('expérience: remarcação, espera, modelos e histórico com isolamento',{t
  await require('../scripts/setup-experience').setupExperience(pool);
  child=spawn(process.execPath,['server.js'],{cwd:path.join(__dirname,'..'),env:{...process.env,PORT:'0',APP_ORIGIN:''},stdio:['ignore','pipe','pipe']});
  base=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Servidor não iniciou')),10000);child.once('error',reject);child.stdout.on('data',b=>{const m=b.toString().match(/http:\/\/localhost:\d+/);if(m){clearTimeout(timer);resolve(m[0]);}});});
- const doctor=await user('doctor'),otherDoctor=await user('otherdoctor'),secretary=await user('secretary','paciente'),otherStaff=await user('otherstaff','paciente'),patient=await user('patient','paciente'),namesake=await user('namesake','paciente');
+ const doctor=await user('doctor'),otherDoctor=await user('otherdoctor'),secretary=await user('secretary','equipe'),otherStaff=await user('otherstaff','equipe'),patient=await user('patient','paciente'),namesake=await user('namesake','paciente');
  for(const actor of [doctor,otherDoctor]){const [p]=await pool.execute("INSERT INTO perfis_profissionais(usuario_id,titulo_profissional) VALUES (?,'Clínico')",[actor.id]);profiles.push(p.insertId);}
  for(const name of ['Local A','Local B']){const [p]=await pool.execute("INSERT INTO locais_atendimento(nome,tipo,endereco,cidade,estado,ativo) VALUES (?,'clinica','Rua','Cidade','MG',1)",[name]);places.push(p.insertId);}
  for(const prof of profiles)for(const local of places)await pool.execute('INSERT INTO profissionais_locais(profissional_id,local_id) VALUES (?,?)',[prof,local]);
@@ -60,14 +60,14 @@ test('expérience: remarcação, espera, modelos e histórico com isolamento',{t
  await pool.execute("INSERT INTO registros_atendimentos(agendamento_id,evolucao,receita,finalizado_em) VALUES (?,'Registro antigo','Receita antiga',NOW())",[bk]);
  }
  const history=await request('/api/consultations/'+active,null,doctor);assert.equal(history.status,200);assert.deepEqual(history.data.history.map(h=>h.id),[historical[0]]);
- assert.equal((await request('/api/consultations/'+active,null,secretary)).status,404);
+ assert.equal((await request('/api/consultations/'+active,null,secretary)).status,403);
  await pool.execute("INSERT INTO registros_atendimentos(agendamento_id,evolucao,receita) VALUES (?,'Iniciado','')",[active]);
  assert.equal((await request('/api/team/appointments/'+active+'/reschedule',{slotId:outside},secretary)).status,409);
  });
  }finally{
  if(child){const stopped=new Promise(r=>child.once('exit',r));child.kill();await stopped;}
  for(const prof of profiles){await pool.execute('DELETE FROM agendamentos WHERE profissional_id=?',[prof]);await pool.execute('DELETE FROM perfis_profissionais WHERE id=?',[prof]);}
- for(const place of places)await pool.execute('DELETE FROM locais_atendimento WHERE id=?',[place]);
+ for(const place of places){await pool.execute('DELETE r FROM pacientes_recepcao r JOIN pacientes_unidades un ON un.paciente_id=r.id WHERE un.local_id=?',[place]);await pool.execute('DELETE FROM locais_atendimento WHERE id=?',[place]);}
  for(const user of users)await pool.execute('DELETE FROM usuarios WHERE id=?',[user]);
  await pool.end();
  }

@@ -25,7 +25,7 @@ test('painel abre hoje e abre registro sem concluir automaticamente',async()=>{
  slots[0].inicio_em='2035-01-20T08:00:00-03:00';tabs[0].listeners.click();assert.equal(get('#patients').children[0].children.at(-2).children[0].disabled,true);
  slots[0].inicio_em='2020-01-01T08:00:00-03:00';tabs[0].listeners.click();assert.equal(get('#patients').children[0].children.at(-2).children[0].disabled,true);
  slots[0].inicio_em=currentDay+'T23:58:00-03:00';tabs[0].listeners.click();
- actions.children[0].listeners.click();assert.equal(destination,'consulta.html?id=2');
+ await actions.children[0].listeners.click();assert.equal(destination,'consulta.html?id=2');
  assert.equal(get('#remaining').textContent,1);assert.ok(!calls.some(c=>c.url.includes('/state')));
  tabs[1].listeners.click();assert.equal(get('#patients').children.length,1);
  get('#day').value='2035-01-20';await get('#filters').listeners.change();assert.ok(calls.at(-1).url.includes('dia=2035-01-20'));

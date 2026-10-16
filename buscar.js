@@ -37,6 +37,7 @@ async function loadCities(){
   citiesReady=true;
 }
 if(localId)view='profissionais';
+for(const key of ['disponibilidade','pagamento','convenio'])if(form.elements[key]){form.elements[key].value=params.get(key)||'';form.elements[key].addEventListener('change',()=>load());}
 form.elements.q.value=params.get('q')||'';
 form.elements.tipo.value=types[params.get('tipo')]?params.get('tipo'):'';
 function node(tag,text,cls){const value=document.createElement(tag);value.textContent=text;if(cls)value.className=cls;return value;}
@@ -58,6 +59,7 @@ function sync(){
   const query=new URLSearchParams({aba:view});
   if(form.elements.q.value.trim())query.set('q',form.elements.q.value.trim());
   if(view==='locais'&&form.elements.tipo.value)query.set('tipo',form.elements.tipo.value);
+  for(const key of ['disponibilidade','pagamento','convenio'])if(form.elements[key]?.value)query.set(key,form.elements[key].value);
   if(localId)query.set('local',localId);
   const city=selectedCity();query.set('cidade',city?city[0]:'');if(city)query.set('uf',city[1]);
   try{history.replaceState(null,'',`buscar.html?${query}`);}catch{/* Arquivos locais podem impedir alteração da URL. */}
@@ -69,7 +71,7 @@ function specialtySummary(card,item){
 function placeCard(item){
   const card=node('article','','result-card');const heading=node('div','','result-heading');const icon=node('span','▦','result-icon');icon.setAttribute('aria-hidden','true');
   const title=node('div','');const nameLink=node('a',item.nome);nameLink.href=`perfil.html?tipo=local&id=${item.id}`;const name=node('h3','');name.append(nameLink);title.append(node('small',types[item.tipo]||'Local de atendimento'),name);heading.append(icon,title);
-  card.append(heading,node('p',address(item),'result-address'));specialtySummary(card,item);
+  card.append(heading,node('p',address(item),'result-address'));specialtySummary(card,item);if(item.next_available_at)card.append(node('p','Próximo horário: '+new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeStyle:'short',timeZone:'America/Sao_Paulo'}).format(new Date(item.next_available_at)),'result-availability'));if(item.convenios)card.append(node('small','Convênios da unidade: '+item.convenios));
   const footer=node('div','','result-footer');
   if(item.telefone){const link=node('a',phone(item.telefone),'result-phone');link.href=`tel:${item.telefone}`;footer.append(link);}
   const choose=node('a','Ver perfil →','result-action');choose.href=`perfil.html?tipo=local&id=${item.id}`;choose.setAttribute('aria-label',`Ver perfil de ${item.nome}`);
@@ -86,7 +88,7 @@ function professionalCard(item){
 }
 function emptyState(title,description,retry){
   const box=node('div','','empty-state');box.append(node('h3',title),node('p',description));
-  box.append(action(retry?'Tentar novamente':'Ver todas as opções',()=>{if(!retry){local=null;localId='';form.elements.q.value='';form.elements.tipo.value='';}load();}));
+  box.append(action(retry?'Tentar novamente':'Ver todas as opções',()=>{if(!retry){local=null;localId='';form.elements.q.value='';form.elements.tipo.value='';for(const key of ['disponibilidade','pagamento','convenio'])if(form.elements[key])form.elements[key].value='';}load();}));
   if(retry&&localId)box.append(action('Escolher outro local',()=>{local=null;localId='';view='locais';load();}));
   if(local?.telefone){const link=node('a','Ligar para o local','result-phone');link.href=`tel:${local.telefone}`;box.append(link);}
   results.replaceChildren(box);
@@ -100,7 +102,8 @@ async function load(){
     const query=new URLSearchParams({q:form.elements.q.value.trim()});
     const city=selectedCity();if(city){query.set('cidade',city[0]);query.set('uf',city[1]);}
     if(view==='locais')query.set('tipo',form.elements.tipo.value);else if(localId)query.set('local',localId);
-    const items=await api(`/api/${view==='locais'?'places':'professionals'}?${query}`);
+    for(const key of ['disponibilidade','pagamento','convenio'])if(form.elements[key]?.value)query.set(key,form.elements[key].value);query.set('tipo_busca',view);
+    const items=await api(form.elements.disponibilidade?'/api/discovery?'+query:`/api/${view==='locais'?'places':'professionals'}?${query}`);
     if(version!==requestVersion)return;
     if(!Array.isArray(items))throw new Error('Resposta inválida');
     status.textContent=`${items.length} ${items.length===1?'opção encontrada':'opções encontradas'}${city?` em ${city[0]} / ${city[1]}`:''}`;
@@ -115,7 +118,7 @@ form.elements.tipo.addEventListener('change',()=>load());
 form.elements.city.addEventListener('change',()=>{local=null;localId='';load();});
 document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>{view=button.dataset.view;if(view==='locais'){local=null;localId='';}load();}));
 document.querySelector('#clear-local').addEventListener('click',()=>{view='locais';local=null;localId='';form.elements.q.value='';load();});
-api('/api/auth/me').then(({user})=>{if(user){const link=document.querySelector('#account-link');link.href=user.role==='administrador'?'admin.html':user.canManage?'atendimento.html':'agendamentos.html';link.textContent=user.role==='administrador'?'Administrar':user.canManage?'Área de atendimento':'Minha conta';}}).catch(()=>{});
+api('/api/auth/me?audience=patient').then(({user})=>{if(user?.role==='paciente'){const link=document.querySelector('#account-link');link.href=user.role==='administrador'?'admin.html':user.isProfessional?'profissional.html':user.role==='equipe'?'atendimento.html':'agendamentos.html';link.textContent=user.role==='administrador'?'Administrar':user.isProfessional?'Minha agenda':user.role==='equipe'?'Área de atendimento':'Minha conta';}}).catch(()=>{});
 load();
 
 results.addEventListener('click',event=>{if(!event.target.closest('a[href^="perfil.html"]'))return;try{sessionStorage.setItem('avelu-search',JSON.stringify({url:location.pathname+location.search,scroll:window.scrollY}));}catch{}});

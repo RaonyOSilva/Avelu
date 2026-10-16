@@ -3,6 +3,7 @@ const pool = require('./db');
 async function canManage(user) {
   if (!user) return false;
   if (user.role === 'administrador') return true;
+  if (user.role !== 'equipe') return false;
   const [rows] = await pool.execute('SELECT id FROM gestao_acessos WHERE usuario_id=? LIMIT 1', [user.id]);
   return rows.length > 0;
 }

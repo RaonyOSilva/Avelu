@@ -10,6 +10,7 @@ module.exports=app=>{
  const access=scope(req.user,'d');
  const [rows]=await c.execute(`SELECT a.*,d.local_id FROM agendamentos a JOIN disponibilidades d ON d.id=a.disponibilidade_id WHERE a.id=? AND ${access.sql} FOR UPDATE`,[req.params.id,...access.values]);
  const old=rows[0];if(!old)throw fail('Agendamento não encontrado.',404);
+ if(old.fluxo==='em_atendimento')throw fail('O atendimento está em andamento e não pode ser remarcado.');
  if(!['agendado','confirmado'].includes(old.status))throw fail('Somente agendamentos ativos podem ser remarcados.');
  const [clinical]=await c.execute('SELECT agendamento_id FROM registros_atendimentos WHERE agendamento_id=?',[old.id]);
  if(clinical.length)throw fail('Este atendimento já possui registro clínico e não pode ser remarcado.');
@@ -19,7 +20,7 @@ module.exports=app=>{
  WHERE d.id=? AND ${access.sql} AND d.status='disponivel' AND d.inicio_em>NOW() FOR UPDATE`,[b.slotId,...access.values]);
  const target=slots[0];if(!target||String(target.profissional_id)!==String(old.profissional_id))throw fail('Escolha um horário livre do mesmo profissional, dentro do seu acesso.');
  const address=[target.endereco,target.numero,target.complemento,target.bairro,target.cidade+'/'+target.estado].filter(Boolean).join(', ');
- await c.execute("UPDATE agendamentos SET disponibilidade_id=?,local_nome=?,local_endereco=?,valor=?,status='agendado' WHERE id=?",[target.id,target.nome,address,target.valor,old.id]);
+ await c.execute("UPDATE agendamentos SET disponibilidade_id=?,local_nome=?,local_endereco=?,valor=?,status='agendado',fluxo='previsto',chegada_em=NULL,iniciado_em=NULL WHERE id=?",[target.id,target.nome,address,target.valor,old.id]);
  await c.execute("UPDATE disponibilidades SET status='disponivel' WHERE id=?",[old.disponibilidade_id]);
  await c.execute("UPDATE disponibilidades SET status='reservado' WHERE id=?",[target.id]);
  for(const [slot,action] of [[old.disponibilidade_id,'remarcar_origem'],[target.id,'remarcar_destino']])await c.execute('INSERT INTO agenda_eventos(usuario_id,disponibilidade_id,agendamento_id,acao) VALUES (?,?,?,?)',[req.user.id,slot,old.id,action]);
