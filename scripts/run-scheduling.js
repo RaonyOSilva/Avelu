@@ -1,1 +1,1 @@
-require('dotenv').config();const pool=require('../db');require('../schedule-service').runRolling().then(()=>console.log('Janelas móveis verificadas.')).catch(e=>{console.error(e.code||e.message);process.exitCode=1;}).finally(()=>pool.end());
+if(process.env.NODE_ENV!=='test')require('dotenv').config();const pool=require('../db');require('../schedule-service').runRolling().then(()=>console.log('Janelas móveis verificadas.')).catch(e=>{require('../operational-log').write('schedule.failed');process.exitCode=1;}).finally(()=>pool.end());

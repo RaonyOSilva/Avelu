@@ -13,7 +13,8 @@
     "db:setup:specialties": "node scripts/setup-specialties.js",
     "db:setup:profiles": "node scripts/setup-profiles.js",
     "admin:grant": "node scripts/grant-admin.js",
-    "test": "node --test tests/*.test.js",
+    "test": "node scripts/run-tests.js",
+    "test:config": "node --test tests/config-isolated.test.js",
     "db:migrate:pt": "node scripts/migrate-to-portuguese.js",
     "db:setup:journey": "node scripts/setup-journey.js",
     "db:setup:team": "node scripts/setup-team.js",
@@ -24,10 +25,15 @@
     "db:setup:operations": "node scripts/setup-operations.js",
     "backup:create": "node scripts/backup.js",
     "backup:verify": "node scripts/backup.js --verify",
-    "db:sync:patients": "node scripts/sync-patients.js"
+    "db:sync:patients": "node scripts/sync-patients.js",
+    "test:integration": "node scripts/run-tests.js --integration",
+    "db:init:empty": "node scripts/initialize-empty.js",
+    "db:fixtures": "node scripts/seed-fixtures.js",
+    "db:migrate:invitations": "node scripts/migrate-invitations.js",
+    "admin:bootstrap": "node scripts/bootstrap-admin.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": "22.23.3"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

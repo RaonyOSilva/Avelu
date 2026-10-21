@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('./require-test-database');
 const {test}=require('node:test'),assert=require('node:assert/strict'),{spawn}=require('node:child_process'),{randomUUID,randomBytes,createHash}=require('node:crypto'),pool=require('../db');
 test('login destination cannot cross account modules',()=>{
  const {loginDestination,home}=require('../access-policy');

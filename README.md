@@ -4,7 +4,7 @@ PWA com frontend em HTML/CSS/JavaScript, API Node.js/Express e banco MySQL.
 
 ## Preparação
 
-1. Instale Node.js 20 ou superior e MySQL 8.
+1. Use a versão Node.js fixada em `.nvmrc` e MySQL 8.
 2. Copie `.env.example` para `.env` e informe seu usuário e senha do MySQL.
 3. Execute `npm install`.
 4. Execute `npm run db:setup` para criar o banco com nomes em português e inserir os dados iniciais.
@@ -14,6 +14,12 @@ PWA com frontend em HTML/CSS/JavaScript, API Node.js/Express e banco MySQL.
 O Live Server ainda pode ser usado para alterações puramente visuais, mas as chamadas `/api` exigem que a página seja aberta pelo servidor Node na porta configurada.
 
 Nunca coloque a senha do MySQL em `app.js`, `index.html` ou em qualquer arquivo servido ao navegador.
+
+Para novos ambientes de homologação/produção, siga o [procedimento da Fase C.2](docs/deploy/FASE-C2.md).
+O `db:setup` acima é legado de desenvolvimento e inclui dados iniciais; não é o procedimento de publicação.
+O banco local existente não deve ser reinicializado. `npm test` agora executa apenas testes isolados,
+sem banco. Testes de integração exigem identificação e confirmação de um banco descartável;
+consulte as barreiras e limitações das suítes legadas no relatório C.2.
 
 ## Cadastro e agendamento
 
@@ -60,9 +66,9 @@ Esse comando promove a conta informada a administrador. O formulário público s
 
 ## Testes da administração
 
-Prepare também `npm run db:setup:admin` antes de `npm test`. Os testes cobrem bloqueio de visitantes e pacientes, validação, publicação e rascunhos, edição, vínculos, reversão de gravações inválidas e e-mail duplicado. Registros de teste são removidos ao final.
+`npm test` executa somente testes sem banco. As suítes de administração e integração estão protegidas e exigem banco descartável explicitamente configurado. Consulte [Fase C.2](docs/deploy/FASE-C2.md) antes de preparar o catálogo e as estruturas exigidos pelas suítes legadas. Nunca execute seus scripts de preparação sobre o banco de desenvolvimento para rodar testes.
 
-Execute `npm test` com o MySQL configurado e a tabela `sessoes` preparada. Os testes iniciam um servidor em porta livre e criam usuários, perfil e horário temporários, removidos ao final. Cobrem busca pública, cadastro, credenciais inválidas, sessão, logout, isolamento entre pacientes, reserva concorrente, limite de tentativas e bloqueio de arquivos privados.
+`npm run test:integration` exige as barreiras de banco descartável da Fase C.2. Essas suítes iniciam um servidor em porta livre e gravam dados fictícios; cobrem busca pública, cadastro, credenciais inválidas, sessão, logout, isolamento entre pacientes, reserva concorrente, limite de tentativas e bloqueio de arquivos privados. A remoção dos registros ao final não substitui o isolamento obrigatório do banco.
 
 ## Jornada de agendamento e conta
 
@@ -163,7 +169,7 @@ Atualizações existentes: execute `npm run db:setup:operations` e `npm run db:s
 
 `npm run backup:create` usa mysqldump com transação consistente e grava somente um arquivo criptografado AES-256-GCM. Configure `BACKUP_DIR`, `BACKUP_KEY` (32 bytes em hexadecimal) e `MYSQLDUMP_PATH` no `.env`. A chave nunca é servida pela aplicação; `.env` e `.backups/` são ignorados pelo Git. Guarde a chave em um local seguro separado: sem ela não é possível restaurar a cópia.
 
-Com essas variáveis, o servidor verifica a cada hora e cria uma cópia quando a última tem mais de 24 horas. O computador e o servidor precisam estar ligados. `npm run backup:verify` restaura a última cópia em um banco aleatório `avelu_restore_test_*`, verifica leitura de todas as tabelas e remove apenas esse banco temporário; requer permissão para criar/excluir banco de teste. O banco principal não é substituído. O status registra a data do teste de restauração.
+Com essas variaveis, o servidor verifica a cada hora e cria uma copia apos 24 horas, com nova tentativa em caso de falha. `npm run backup:verify` verifica somente a integridade criptografica, sem acessar ou criar bancos. Ensaios de restauracao usam exclusivamente `scripts/restore-backup.js` em instancia descartavel comprovada; veja [Fase C.4](docs/deploy/FASE-C4.md).
 
 Neste ambiente, o backup está configurado em `.backups`, no mesmo computador. A cópia fora da máquina, o domínio HTTPS e a entrega de recuperação de senha por e-mail continuam dependendo da futura hospedagem e serviço externo. Não há envio de e-mail ativado no localhost.
 # Tipos de acesso aos módulos
@@ -173,3 +179,7 @@ O campo `usuarios.tipo` define um único tipo de acesso por conta: Cliente (`pac
 Execute `node scripts/setup-access.js` em bancos existentes. Clientes não são promovidos por vínculos antigos. Contas antigas de profissional sem perfil clínico e com vínculos de gestão são classificadas como equipe. Revise os tipos em **Usuários e permissões**. Alterar o tipo encerra todas as sessões da conta e registra a ação na auditoria.
 
 Clientes acessam somente seus agendamentos e registros; profissionais acessam seu módulo clínico; equipe acessa a gestão de agendas dentro dos vínculos concedidos; administradores mantêm os módulos administrativos e de gestão, sem acesso ao módulo clínico. As regras são verificadas no servidor para páginas e APIs. Vínculos de gestão não substituem o tipo de conta. Uma pessoa que precise atuar em funções diferentes deve utilizar contas separadas.
+
+## Homologacao com convidados (Fase C.3)
+
+Configuracao, migracao de convites, bootstrap do administrador e evidencias: [Fase C.3](docs/deploy/FASE-C3.md). Nenhum deploy automatico.

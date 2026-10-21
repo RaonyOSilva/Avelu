@@ -9,7 +9,7 @@ function apiRoles(path){
 function pageRoles(path,query){
  if(['/profissional.html','/consulta.html'].includes(path))return ['profissional'];
  if(['/atendimento.html','/programacao.html'].includes(path))return ['equipe','administrador'];
- if(['/admin.html','/agenda-admin.html','/equipe.html'].includes(path))return ['administrador'];
+ if(['/admin.html','/agenda-admin.html','/equipe.html','/convites.html'].includes(path))return ['administrador'];
  if(path==='/operacao.html')return ['pacientes','comunicacao'].includes(query.aba)?['equipe','administrador']:['administrador'];
  if(path==='/agendamentos.html')return ['paciente'];
  return null;

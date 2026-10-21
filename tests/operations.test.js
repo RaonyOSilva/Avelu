@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('./require-test-database');
 const {test}=require('node:test'),assert=require('node:assert/strict'),{spawn}=require('node:child_process'),{randomBytes,createHash}=require('node:crypto'),pool=require('../db'),{passwordHash}=require('../auth');
 test('operação integrada: fila, pacientes, descoberta e administração',{timeout:60000},async t=>{
  let server,base;const users=[],places=[],profiles=[],patients=[];const suffix=randomBytes(6).toString('hex');

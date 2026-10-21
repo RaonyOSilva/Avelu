@@ -23,7 +23,7 @@ async function insertSlots(c,ruleId,user,config,result){
  await c.query('INSERT INTO agenda_eventos(usuario_id,disponibilidade_id,acao) VALUES ?',[created.map(s=>[user.id,s.id,'publicar_periodo'])]);
  }
 }
-async function transaction(work){let c;try{c=await pool.getConnection();await c.beginTransaction();const result=await work(c);await c.commit();return result;}catch(e){if(c)await c.rollback();throw e;}finally{c?.release();}}
+async function transaction(work,connection){let c=connection;try{c=c||await pool.getConnection();await c.beginTransaction();const result=await work(c);await c.commit();return result;}catch(e){if(c)await c.rollback();throw e;}finally{if(!connection)c?.release();}}
 async function preview(user,body){
  const config=normalize(body),place=await location(pool,user,config),result=await evaluateDb(pool,config,new Date());
  return{...summary(result),key:fingerprint(config,result,place),place};
@@ -78,25 +78,32 @@ async function withdraw(user,id,body){
  return{removed:free.length,preserved:slots.filter(s=>s.reservado||s.status==='reservado').length};
  });
 }
-async function processRule(id,now=new Date()){
+async function processRule(id,now=new Date(),connection){
  return transaction(async c=>{
  const [rows]=await c.execute("SELECT * FROM programacoes_agenda WHERE id=? AND status='ativa' FOR UPDATE",[id]);
  if(!rows.length)return;
  const rule=rows[0],config=configOf(rule);
  const [users]=await c.execute('SELECT id,tipo AS role FROM usuarios WHERE id=? AND ativo=1',[rule.usuario_id]);
  const user=users[0];
- if(!user){await c.execute("UPDATE programacoes_agenda SET status='pausada',ultimo_erro='Conta responsável desativada.' WHERE id=?",[id]);return;}
+ if(!user||!['equipe','administrador'].includes(user.role)){await c.execute("UPDATE programacoes_agenda SET status='pausada',ultimo_erro='Conta responsável sem autorização.' WHERE id=?",[id]);return;}
  await c.execute('SELECT id FROM perfis_profissionais WHERE id=? FOR UPDATE',[rule.profissional_id]);
  try{await location(c,user,config);}catch(e){if(e.status===403){await c.execute("UPDATE programacoes_agenda SET status='pausada',ultimo_erro=? WHERE id=?",[e.message,id]);return;}throw e;}
  const result=await evaluateDb(c,config,now);
  await insertSlots(c,id,user,config,result);
  await c.execute("UPDATE programacoes_agenda SET status=?,ultima_execucao=NOW(),ultimo_erro=NULL WHERE id=?",[config.fim<=result.end?'concluida':'ativa',id]);
  return summary(result);
- });
+ },connection);
 }
-async function runRolling(now=new Date()){
- const [rows]=await pool.query("SELECT id FROM programacoes_agenda WHERE status='ativa' ORDER BY ultima_execucao,id LIMIT 500");
- for(const row of rows){try{await processRule(row.id,now);}catch(e){await pool.execute('UPDATE programacoes_agenda SET ultima_execucao=NOW(),ultimo_erro=? WHERE id=?',['Não foi possível atualizar. Nova tentativa automática; verifique o servidor.',row.id]);}}
+async function runRolling(now=new Date(),shouldStop=()=>false){
+ const lock=await pool.getConnection();let acquired=false;
+ try{
+ const [[result]]=await lock.execute('SELECT GET_LOCK(?,0) AS acquired',['avelu:rolling:'+process.env.DB_NAME]);
+ acquired=result.acquired===1;if(!acquired)return;
+ require('./operational-log').write('schedule.started');
+ const [rows]=await lock.query("SELECT id FROM programacoes_agenda WHERE status='ativa' ORDER BY ultima_execucao,id LIMIT 500");
+ for(const row of rows){if(shouldStop())break;try{await processRule(row.id,now,lock);}catch(e){require('./runtime-health').failure();require('./operational-log').write('schedule.failed');await lock.execute('UPDATE programacoes_agenda SET ultima_execucao=NOW(),ultimo_erro=? WHERE id=?',['Não foi possível atualizar. Nova tentativa automática; verifique o servidor.',row.id]);}}
+ require('./operational-log').write('schedule.completed',{count:rows.length});
+ }finally{if(acquired)await lock.execute('SELECT RELEASE_LOCK(?)',['avelu:rolling:'+process.env.DB_NAME]).catch(()=>{});lock.release();}
 }
-function startWorker(){let running=false;const run=async()=>{if(running)return;running=true;try{await runRolling();}catch(e){console.error('Programação automática:',e.code||e.name);}finally{running=false;}};const timer=setInterval(run,15*60000);timer.unref();run();return()=>clearInterval(timer);}
+function startWorker(){let stopping=false;const stop=require('./background-task').start(()=>runRolling(new Date(),()=>stopping),15*60000,{onError:()=>{require('./runtime-health').failure();require('./operational-log').write('schedule.failed');}});return()=>{stopping=true;return stop();};}
 module.exports={preview,publish,changeState,withdraw,runRolling,processRule,startWorker,summary,configOf,location};

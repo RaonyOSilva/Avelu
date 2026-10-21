@@ -41,6 +41,7 @@ module.exports = function mountTeamAccess(app) {
       if (users[0] && !users[0].ativo) { await connection.rollback(); return res.status(400).json({ error: 'Esta conta está desativada.' }); }
       if(users[0]?.tipo==='paciente'){await connection.rollback();return res.status(400).json({error:'Defina explicitamente o tipo Equipe em Usuarios e permissoes antes de liberar vinculos. Clientes nao recebem acesso a equipe.'});}
       const needsPassword = !users.length || users[0].senha_hash === 'CADASTRO_ADMINISTRATIVO_SEM_LOGIN';
+      if(needsPassword&&require('./config').loadConfig().access.inviteOnly){await connection.rollback();return res.status(400).json({error:'Envie um convite e aguarde o cadastro antes de liberar os vínculos.'});}
       if (users[0]?.senha_hash === 'CONTA_DEMONSTRACAO_SEM_LOGIN') { await connection.rollback(); return res.status(400).json({ error: 'Cadastre um profissional real para liberar acesso.' }); }
       if (needsPassword && (typeof b.senha !== 'string' || b.senha.length < 8 || b.senha.length > 128 || (!users.length && (typeof b.nome !== 'string' || b.nome.trim().length < 2 || b.nome.trim().length > 150)))) {
         await connection.rollback(); return res.status(400).json({ error: 'Para uma conta nova ou sem acesso, informe nome e uma senha inicial de 8 a 128 caracteres.' });

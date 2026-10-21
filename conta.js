@@ -1,6 +1,11 @@
 const page = document.body.dataset.page;
 const params = new URLSearchParams(location.search);
 const message = document.querySelector('#form-message');
+let invitationToken;
+if(page==='register'){
+ invitationToken=new URLSearchParams(location.hash.slice(1)).get('convite')||undefined;
+ if(invitationToken)history.replaceState(null,'',location.pathname+location.search);
+}
 function safeNext(value) {
   if (!value) return '/agendamentos.html';
   try {
@@ -52,11 +57,16 @@ if (page === 'register' || page === 'login') {
     message.textContent = '';
     button.disabled = true; button.textContent = 'Aguarde…';
     try {
-      const result = await api(`/api/auth/${page}`, { method: 'POST', body: JSON.stringify({...data,next}) });
+      const result = await api(`/api/auth/${page}`, { method: 'POST', body: JSON.stringify({...data,next,...(page==='register'?{invitationToken}:{})}) });
       location.assign(result.redirect || (result.user.role === 'paciente' ? next : result.user.role === 'administrador' ? '/admin.html' : result.user.role === 'profissional' ? '/profissional.html' : '/atendimento.html'));
     } catch (error) { message.textContent = error.message; }
     finally { button.disabled = false; button.textContent = original; }
   });
+}
+
+if(page==='register'){
+ const submit=document.querySelector('#auth-form [type=submit]');submit.disabled=true;
+ api('/api/environment').then(env=>{submit.disabled=env.inviteOnly&&!invitationToken;if(env.inviteOnly)message.textContent=invitationToken?'Use o mesmo e-mail que recebeu o convite e dados fictícios para os testes.':'O cadastro exige um convite. Solicite-o ao administrador e abra o link recebido por e-mail.';}).catch(error=>{message.textContent=error.message;});
 }
 
 

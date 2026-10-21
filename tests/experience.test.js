@@ -1,5 +1,5 @@
 
-require('dotenv').config();
+require('./require-test-database');
 const {test}=require('node:test'),assert=require('node:assert/strict'),{spawn}=require('node:child_process'),{randomUUID,randomBytes,createHash}=require('node:crypto'),path=require('node:path'),pool=require('../db');
 test('expérience: remarcação, espera, modelos e histórico com isolamento',{timeout:30000},async t=>{
  const users=[],profiles=[],places=[],bookings=[],suffix=randomUUID();let child,base;

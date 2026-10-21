@@ -1,5 +1,5 @@
 
-require('dotenv').config();
+require('./require-test-database');
 const {test}=require('node:test'),assert=require('node:assert/strict'),{spawn}=require('node:child_process'),{randomBytes,randomUUID,createHash}=require('node:crypto'),path=require('node:path'),pool=require('../db');
 const service=require('../schedule-service');
 test('programações: prévia, concorrência, escopo, retirada e janela móvel',{timeout:60000},async t=>{

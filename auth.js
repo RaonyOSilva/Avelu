@@ -65,9 +65,11 @@ const cleanup = setInterval(() => {
 cleanup.unref();
 function authLimit(request, response, next) {
   const email = typeof request.body?.email === 'string' ? request.body.email.trim().toLowerCase() : '';
-  const keys = [`ip:${request.ip}`, `email:${email}`];
+  const digest=value=>createHash('sha256').update(String(value)).digest('hex');
+  const keys = [`ip:${digest(request.ip)}`, `email:${digest(email)}`];
   for (const key of keys) {
     let item = attempts.get(key);
+    if(!item&&attempts.size>=10000){response.set('Retry-After','60');return response.status(429).json({error:'Muitas tentativas. Aguarde alguns minutos.'});}
     if (!item || item.until <= Date.now()) { item = { count: 0, until: Date.now() + 15 * 60000 }; attempts.set(key, item); }
     item.count++;
     if (item.count > (key.startsWith('ip:') ? 40 : 15)) {
@@ -78,7 +80,9 @@ function authLimit(request, response, next) {
   next();
 }
 
-function mountAuth(app) {
+function mountAuth(app, options={}) {
+  const access=options.access||require('./config').loadConfig().access;
+  const invitations=options.invitations||require('./invitation-service').createInvitations({pool,ttl:access.ttl,send:require('./invitation-service').mailSender(),passwordHash});
   app.post('/api/auth/register', authLimit, async (request, response, next) => {
     try {
       const { name, email, password, phone } = request.body || {};
@@ -94,10 +98,16 @@ function mountAuth(app) {
         return response.status(400).json({ error: 'Informe um telefone válido com DDD, ou deixe o campo em branco.' });
       }
       const normalizedEmail = email.trim().toLowerCase();
+      if(access.inviteOnly){
+        const user=await invitations.consume({token:request.body?.invitationToken,email:normalizedEmail,name:name.trim(),password,phone:normalizedPhone,role:request.body?.role});
+        await createSession(request,response,user.id);
+        return response.status(201).json({user,redirect:require('./access-policy').loginDestination(user,request.body?.next)});
+      }
       const [result] = await pool.execute("INSERT INTO usuarios (tipo, nome_completo, email, senha_hash, telefone) VALUES ('paciente', ?, ?, ?, ?)", [name.trim(), normalizedEmail, await passwordHash(password), normalizedPhone || null]);
       await createSession(request, response, result.insertId);
       response.status(201).json({ user: { id: result.insertId, name: name.trim(), email: normalizedEmail, role: 'paciente' } });
     } catch (error) {
+      if(error.status)return response.status(error.status).json({error:error.message});
       if (error.code === 'ER_DUP_ENTRY') return response.status(409).json({ error: 'Este e-mail já está cadastrado. Entre na sua conta.' });
       next(error);
     }
