@@ -20,6 +20,7 @@ app.set('trust proxy',config.trustProxy);
 app.use(require('./operational-log').requests);
 app.use(helmet(require('./http-security').options(config.hosted)));
 app.use((req,res,next)=>{if(req.path==='/'||/\.html$/i.test(req.path))res.set('Cache-Control','no-store');next();});
+app.use(require('./capability-control').createCapabilityGuard(config.features));
 const stopHealth=require('./operational-health').mount(app,pool);
 app.use(express.json({ limit: '100kb' }));
 if(config.access.homologation)app.use((req,res,next)=>{res.set('X-Robots-Tag','noindex, nofollow, noarchive');next();});
@@ -131,7 +132,7 @@ const server = app.listen(port, config.host, () => {
 });
 
 const stopBackup=process.env.NODE_ENV!=='test'&&port!==0?require('./backup-service').start():()=>{};
-const stopScheduling=process.env.NODE_ENV!=='test'&&port!==0?require('./schedule-service').startWorker():()=>{};
+const stopScheduling=process.env.NODE_ENV!=='test'&&port!==0&&config.features.FEATURE_SCHEDULE_WORKER?require('./schedule-service').startWorker():()=>{};
 
 server.on('error',()=>{console.error('Não foi possível iniciar o serviço HTTP.');process.exit(1);});
 require('./server-lifecycle').installShutdown({server,pool,stopTasks:[stopHealth,stopBackup,stopScheduling],timeoutMs:config.shutdownTimeout});

@@ -1,6 +1,7 @@
 const {isIP}=require('node:net');
 // Pure validation: never reads .env, opens connections or prints values.
 function loadConfig(env=process.env){
+ const features=require('./feature-config').loadFeatures(env);
  const errors=[];
  const mode=env.NODE_ENV||'development';
  const stage=env.APP_ENV||mode;
@@ -28,6 +29,7 @@ function loadConfig(env=process.env){
  config.db=database.options;
  config.database=database;
  config.access=require('./homologation-config').homologationConfig(env,stage);
+ config.features=features;
  return config;
 }
 module.exports={loadConfig};

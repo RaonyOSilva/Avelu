@@ -1,5 +1,11 @@
 
-const pool=require('./db'),{scope}=require('./team-permissions'),{normalize,evaluate,fingerprint,today,date,validId}=require('./schedule-engine');
+const {normalize,evaluate,fingerprint,today,date,validId}=require('./schedule-engine');
+const {assertTask}=require('./capability-control');
+function summary(result){return{created:result.created,excluded:result.excluded,expired:result.expired,deferred:result.deferred,end:result.end,days:result.days,conflictCount:result.conflicts.length,conflicts:result.conflicts.slice(0,200)};}
+function configOf(rule){return typeof rule.configuracao==='string'?JSON.parse(rule.configuracao):rule.configuracao;}
+// Dependency injection keeps closed calls and isolated tests away from the DB.
+function createScheduleService({pool,features,scope,startTask}){
+ if(!require('./feature-config').isValidated(features))throw Error('Validated feature configuration required.');
 const fail=(message,status=409)=>Object.assign(new Error(message),{status});
 async function location(c,user,config){
  const access=scope(user,'pl');
@@ -12,7 +18,6 @@ async function evaluateDb(c,config,now){
  const [existing]=await c.execute(`SELECT d.id,d.status,DATE_FORMAT(d.inicio_em,'%Y-%m-%d %H:%i:%s') AS inicio,DATE_FORMAT(d.fim_em,'%Y-%m-%d %H:%i:%s') AS fim,l.nome AS local FROM disponibilidades d LEFT JOIN locais_atendimento l ON l.id=d.local_id WHERE d.profissional_id=? AND d.inicio_em<? AND d.fim_em>? ORDER BY d.inicio_em`,[config.profissional_id,config.fim+' 23:59:59',config.inicio+' 00:00:00']);
  return evaluate(config,existing,now);
 }
-function summary(result){return{created:result.created,excluded:result.excluded,expired:result.expired,deferred:result.deferred,end:result.end,days:result.days,conflictCount:result.conflicts.length,conflicts:result.conflicts.slice(0,200)};}
 async function insertSlots(c,ruleId,user,config,result){
  for(let i=0;i<result.available.length;i+=250){
  const batch=result.available.slice(i,i+250),values=batch.map(s=>[config.profissional_id,config.local_id,s.inicio,s.fim,config.valor]);
@@ -51,7 +56,6 @@ async function authorizedRule(c,user,id){
  if(!rows.length)throw fail('Programação não encontrada.',404);
  return rows[0];
 }
-function configOf(rule){return typeof rule.configuracao==='string'?JSON.parse(rule.configuracao):rule.configuracao;}
 async function changeState(user,id,status){
  if(!['ativa','pausada'].includes(status))throw fail('Estado inválido.',400);
  return transaction(async c=>{
@@ -105,5 +109,21 @@ async function runRolling(now=new Date(),shouldStop=()=>false){
  require('./operational-log').write('schedule.completed',{count:rows.length});
  }finally{if(acquired)await lock.execute('SELECT RELEASE_LOCK(?)',['avelu:rolling:'+process.env.DB_NAME]).catch(()=>{});lock.release();}
 }
-function startWorker(){let stopping=false;const stop=require('./background-task').start(()=>runRolling(new Date(),()=>stopping),15*60000,{onError:()=>{require('./runtime-health').failure();require('./operational-log').write('schedule.failed');}});return()=>{stopping=true;return stop();};}
-module.exports={preview,publish,changeState,withdraw,runRolling,processRule,startWorker,summary,configOf,location};
+function startWorker(){let stopping=false;const stop=startTask(()=>runRolling(new Date(),()=>stopping),15*60000,{onError:()=>{require('./runtime-health').failure();require('./operational-log').write('schedule.failed');}});return()=>{stopping=true;return stop();};}
+ const guarded={summary,configOf};
+ for(const [name,fn] of Object.entries({preview,publish,changeState,withdraw,runRolling,processRule,startWorker,location})){
+  guarded[name]=(...args)=>{assertTask(['startWorker','runRolling','processRule'].includes(name)?'schedule-worker':'schedule-service',features);return fn(...args);};
+ }
+ return Object.freeze(guarded);
+}
+const exported={createScheduleService,summary,configOf};
+// Resolve application dependencies only after capability validation. Importing
+// this module or invoking a closed service never imports db/team-permissions.
+for(const name of ['preview','publish','changeState','withdraw','runRolling','processRule','startWorker','location']){
+ exported[name]=(...args)=>{
+  const features=require('./config').loadConfig().features;
+  assertTask(['startWorker','runRolling','processRule'].includes(name)?'schedule-worker':'schedule-service',features);
+  return createScheduleService({features,pool:require('./db'),scope:require('./team-permissions').scope,startTask:require('./background-task').start})[name](...args);
+ };
+}
+module.exports=Object.freeze(exported);

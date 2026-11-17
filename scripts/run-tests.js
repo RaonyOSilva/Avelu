@@ -2,7 +2,7 @@ const {spawnSync}=require('node:child_process');
 const path=require('node:path');
 const fs=require('node:fs');
 const integration=['access-policy','admin','auth-booking','experience','operations','scheduling','team','mysql-roundtrip','invitations','registration-compat','operational'];
-const isolated=['deploy-isolated','https-isolated','booking-ui','config-isolated','consultation-ui','database-isolated','local-booking-ui','navigation-access','operations-ui','professional-ui','schedule-engine','search-ui','session-exit','team-ui','timezone-isolated','whatsapp-confirmation','invitations-isolated','operational-isolated'];
+const isolated=['isolation-mounted','features-isolated','deploy-isolated','https-isolated','booking-ui','config-isolated','consultation-ui','database-isolated','local-booking-ui','navigation-access','operations-ui','professional-ui','schedule-engine','search-ui','session-exit','team-ui','timezone-isolated','whatsapp-confirmation','invitations-isolated','operational-isolated'];
 const wantsIntegration=process.argv.includes('--integration');
 if(wantsIntegration){
  try{require('../database-config').assertDisposable(process.env);}catch(error){console.error(error.message);process.exit(1);}
